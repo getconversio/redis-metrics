@@ -1,0 +1,11 @@
+{
+  "source": {
+    "include": [ "lib/" ]
+  },
+  "opts": {
+    "destination": "out/",
+    "tutorials": "docs/",
+    "recurse": true,
+    "readme": "README.md"
+  }
+}

@@ -30,5 +30,5 @@ node_modules
 # Vim swp
 *.swp
 
-# Ignore docs for now
-docs
+# Ignore docs output folder
+out

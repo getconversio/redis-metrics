@@ -12,15 +12,22 @@ In a sense, the libary tries to provide sugar-coated method calls for storing
 and fetching Redis data to report counts and trends. The first design goal is to
 make counting simpler.
 
-Usage
+Install
+-------
+
+```console
+$ npm install --save redis-metrics
+```
+
+Use
 ----- 
 
-```node
-// Create an instance of the me
+```javascript
+// Create an instance
 var RedisMetrics = require('redis-metrics');
 var metrics = new RedisMetrics();
 
-// Get a counter for a "pageview" event and increment it three times.
+// Create a counter for a "pageview" event and increment it three times.
 var myCounter = metrics.counter('pageview');
 myCounter.incr();
 myCounter.incr();
