@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: counter.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: counter.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>'use strict';
+
+var _ = require('lodash'),
+    Q = require('q'),
+    moment = require('moment'),
+    timeGranularities = require('./constants').timeGranularities,
+    utils = require('./utils');
+
+var defaults = {
+  timeGranularity: timeGranularities.none
+};
+
+var momentFormat = 'YYYYMMDDHHmmss';
+
+var parseTimeGranularity = function(timeGranularity) {
+  timeGranularity = timeGranularities[timeGranularity];
+  if (timeGranularity) return timeGranularity;
+  else return timeGranularities.none;
+};
+
+/**
+ * Creates a function that parses a list of Redis results and matches them up
+ * with the given keyRange
+ * @param {array} keyRange - The list of keys to match with the results.
+ * @returns {function}
+ * @private
+ */
+var createRangeParser = function(keyRange) {
+  return function(results) {
+    return _.zipObject(keyRange, utils.parseIntArray(results));
+  };
+};
+
+/**
+ * A timestamped event counter.
+ *
+ * This constructor is usually not called directly but through the
+ * {@link RedisMetrics#counter} function.
+ *
+ * The timestamped counter stores one or more Redis keys based on the given
+ * event name and time granularity appends a timestamp to the key before
+ * storing the key in Redis. The counter can then report an overall aggregated
+ * count or a specific count for a time range, depending on the chosen
+ * granularity of the timestamp.
+ *
+ * If no time granularity is chosen at creation time, the counter will work
+ * just like a global counter for the given key, i.e. events will not be
+ * timestamped.
+ *
+ * @param {RedisMetrics} metrics - An instance of a RedisMetrics client.
+ * @param {string} key - The base key to use for this counter.
+ * @class
+ */
+function TimestampedCounter(metrics, key, options) {
+  this.metrics = metrics;
+  this.key = key;
+  this.options = options || {};
+  _.defaults(this.options, defaults);
+
+  this.options.timeGranularity =
+    parseTimeGranularity(this.options.timeGranularity);
+}
+
+/**
+ * Return a list of Redis keys that are associated with this counter at the
+ * current point in time and will be written to Redis.
+ * @returns {Array}
+ */
+TimestampedCounter.prototype.getKeys = function() {
+  var keys = [this.key]; // Always add the key itself.
+
+  // If no time granularity is chosen, the timestamped keys will not be used so
+  // just return the default key.
+  if (this.options.timeGranularity === timeGranularities.none) {
+    return keys;
+  }
+
+  var now = moment.utc().format(momentFormat);
+  for (var i = 1; i &lt;= this.options.timeGranularity; i++) {
+    keys.push(this.key + ':' + now.slice(0, i*2+2));
+  }
+  return keys;
+};
+
+/**
+ * Increments this counter with 1.
+ *
+ * @param {function} [callback] - Optional callback.
+ * @returns {Promise} A promise that resolves to the results from Redis. Can
+ * be used instead of the callback function.
+ */
+TimestampedCounter.prototype.incr = function(callback) {
+  var deferred = Q.defer();
+  var cb = utils.createRedisCallback(deferred, callback);
+
+  var keysToIncrement = this.getKeys();
+  if (keysToIncrement.length === 1) {
+    this.metrics.client.incr(keysToIncrement[0], cb);
+  } else {
+    var multi = this.metrics.client.multi();
+    keysToIncrement.forEach(function(key) {
+      multi.incr(key);
+    });
+    multi.exec(cb);
+  }
+
+  return deferred.promise;
+};
+
+/**
+ * Returns the current count for this counter.
+ *
+ * If a specific time granularity is given, the value returned is the current
+ * value at the given granularity level. Effectively, this provides a single
+ * answer to questions such as "what is the count for the current day".
+ *
+ * @example
+ * myCounter.count(function(err, result) {
+ *   console.log(result); // Outputs the global count
+ * });
+ * @example
+ * myCounter.count('year', function(err, result) {
+ *   console.log(result); // Outputs the count for the current year
+ * });
+ *
+ * @param {module:constants~timeGranularities} [timeGranularity] - The
+ * granularity level to report the count for.
+ * @param {function} [callback] - Optional callback.
+ * @returns {Promise} A promise that resolves to the result from Redis. Can
+ * be used instead of the callback function.
+ */
+TimestampedCounter.prototype.count = function(timeGranularity, callback) {
+  if (typeof timeGranularity === 'function') {
+    callback = timeGranularity;
+    timeGranularity = timeGranularities.none;
+  } else {
+    timeGranularity = parseTimeGranularity(timeGranularity);
+  }
+
+  var deferred = Q.defer();
+  var cb = utils.createRedisCallback(deferred, callback, utils.parseInt);
+  this.metrics.client.get(this.getKeys()[timeGranularity], cb);
+  return deferred.promise;
+};
+
+/**
+ * Returns a object mapping timestamps to counts in the given time range at a
+ * specific time granularity level.
+ *
+ * Notice: This function does not make sense for the "none" time granularity.
+ *
+ * @param {module:constants~timeGranularities} timeGranularity - The
+ *   granularity level to report the count for.
+ * @param {Date|Object|string|number} startDate - Start date for the range
+ *   (inclusive). Accepts the same argument as the constructor of a
+ *   {@link http://momentjs.com/|moment} date.
+ * @param {Date|Object|string|number} [endDate=new Date()] - End date for the
+ *   range (inclusive). Accepts the same arguments as the constructor of a
+ *   {@link http://momentjs.com/|moment} date.
+ * @param {function} [callback] - Optional callback.
+ * @returns {Promise} A promise that resolves to the result from Redis. Can
+ *   be used instead of the callback function.
+ */
+TimestampedCounter.prototype.countRange =
+    function(timeGranularity, startDate, endDate, callback) {
+  timeGranularity = parseTimeGranularity(timeGranularity);
+  if (typeof endDate === 'function') {
+    callback = endDate;
+    endDate = moment.utc();
+  } else {
+    endDate = endDate || moment.utc();
+  }
+
+  var momentRange = utils.momentRange(startDate, endDate, timeGranularity);
+  var _this = this;
+  var keyRange = [];
+  var momentKeyRange = [];
+
+  // Create the range of keys to fetch from Redis as well as the keys to use in
+  // the returned data object.
+  momentRange.forEach(function(m) {
+    // Redis key range
+    keyRange.push(
+      _this.key + ':' + m.format(momentFormat).slice(0, timeGranularity*2+2));
+
+    // Timestamp range. Use ISO format for easy parsing back to a timestamp.
+    momentKeyRange.push(m.format());
+  });
+
+  var deferred = Q.defer();
+  var rangeParser = createRangeParser(momentKeyRange);
+  var cb = utils.createRedisCallback(deferred, callback, rangeParser);
+
+  this.metrics.client.mget(keyRange, cb);
+
+  return deferred.promise;
+};
+
+module.exports = TimestampedCounter;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-constants.html">constants</a></li><li><a href="module-utils.html">utils</a></li></ul><h3>Classes</h3><ul><li><a href="RedisMetrics.html">RedisMetrics</a></li><li><a href="TimestampedCounter.html">TimestampedCounter</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-beta3</a> on Mon Apr 13 2015 16:42:48 GMT+0200 (CEST)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
