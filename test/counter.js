@@ -5,6 +5,7 @@ var chai = require('chai'),
     assert = chai.assert,
     sinon = require('sinon'),
     redis = require('redis'),
+    moment = require('moment'),
     RedisMetrics = require('../lib/metrics'),
     TimestampedCounter = require('../lib/counter');
 
@@ -55,7 +56,7 @@ describe('Counter', function() {
     });
 
     it('should return keys based on the granularity level', function() {
-      sandbox.useFakeTimers(Date.parse('2015-01-02T03:04:05Z'));
+      sandbox.useFakeTimers(new Date('2015-01-02T03:04:05Z').getTime());
 
       var counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'none'
@@ -316,14 +317,18 @@ describe('Counter', function() {
   });
 
   describe('countRange', function() {
-    it('should return a range of counts for a specific time granularity', function(done) {
+    it('should return a range of counts', function(done) {
       var counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
-      // Increment in 2014 and 2015
-      // Year granularity should return two values for a start and end date
-      // that use 2014-2015
+      // Increment 2014 once and 2015 twice
+
+      var start = moment.utc({ year: 2014 });
+      var end = moment.utc({ year: 2015 });
+      var expected = {};
+      expected[start.format()] = 1;
+      expected[end.format()] = 2;
 
       var clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
       counter.incr()
@@ -335,11 +340,17 @@ describe('Counter', function() {
           return counter.incr();
         })
         .then(function() {
-          return counter.countRange('year', { year: 2014 }, { year: 2015 });
+          return counter.countRange('year', start, end);
         })
         .then(function(result) {
-          expect(result).to.deep.equal([1, 2]);
-          done();
+          // Check promise
+          expect(result).to.deep.equal(expected);
+
+          // Check callback
+          counter.countRange('year', start, end, function(err, res) {
+            expect(res).to.deep.equal(expected);
+            done();
+          });
         })
         .catch(done);
     });
@@ -349,9 +360,12 @@ describe('Counter', function() {
         timeGranularity: 'year'
       });
 
-      // Increment in 2014 and 2015
-      // Year granularity should return two values for a start and end date
-      // that use 2014-2015
+      // Increment 2014 once and 2015 twice
+
+      var start = moment.utc({ year: 2014 });
+      var expected = {};
+      expected[start.format()] = 1;
+      expected[moment.utc(start).add(1, 'years').format()] = 2;
 
       var clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
       counter.incr()
@@ -363,11 +377,17 @@ describe('Counter', function() {
           return counter.incr();
         })
         .then(function() {
-          return counter.countRange('year', { year: 2014 });
+          return counter.countRange('year', start);
         })
         .then(function(result) {
-          expect(result).to.deep.equal([1, 2]);
-          done();
+          // Check promise
+          expect(result).to.deep.equal(expected);
+
+          // Check callback
+          counter.countRange('year', start, function(err, res) {
+            expect(res).to.deep.equal(expected);
+            done();
+          });
         })
         .catch(done);
     });
@@ -377,18 +397,110 @@ describe('Counter', function() {
         timeGranularity: 'year'
       });
 
-      // Increment in 2014
-      // Year granularity should return two values for a start and end date
-      // that are in this year.
+      // Increment 2014 once.
+
+      var start = moment.utc({ year: 2014 });
+      var end = moment.utc({ year: 2015 });
+      var expected = {};
+      expected[start.format()] = 1;
+      expected[end.format()] = 0;
 
       var clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
       counter.incr()
         .then(function() {
-          return counter.countRange('year', { year: 2014 }, { year: 2015 });
+          return counter.countRange('year', start, end);
         })
         .then(function(result) {
-          expect(result).to.deep.equal([1, 0]);
-          done();
+          // Check promise
+          expect(result).to.deep.equal(expected);
+
+          // Check callback
+          counter.countRange('year', start, end, function(err, res) {
+            expect(res).to.deep.equal(expected);
+            done();
+          });
+        })
+        .catch(done);
+    });
+
+    it('should accept strings for date range', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      // Increment 2014 once and 2015 twice
+
+      var start = moment.utc({ year: 2014 });
+      var end = moment.utc({ year: 2015 });
+      var expected = {};
+      expected[start.format()] = 1;
+      expected[end.format()] = 2;
+
+      var startStr = '2014-01-01T00:00:00Z';
+      var endStr = '2015-01-01T00:00:00Z';
+
+      var clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
+      counter.incr()
+        .then(function() {
+          clock.tick(1000*60*60*24*365);
+          return counter.incr();
+        })
+        .then(function() {
+          return counter.incr();
+        })
+        .then(function() {
+          return counter.countRange('year', startStr, endStr);
+        })
+        .then(function(result) {
+          // Check promise
+          expect(result).to.deep.equal(expected);
+
+          // Check callback
+          counter.countRange('year', startStr, endStr, function(err, res) {
+            expect(res).to.deep.equal(expected);
+            done();
+          });
+        })
+        .catch(done);
+    });
+
+    it('should accept numbers for date range', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      // Increment 2014 once and 2015 twice
+
+      var start = moment.utc({ year: 2014 });
+      var end = moment.utc({ year: 2015 });
+      var expected = {};
+      expected[start.format()] = 1;
+      expected[end.format()] = 2;
+
+      var startNum = start.valueOf();
+      var endNum = end.valueOf();
+
+      var clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
+      counter.incr()
+        .then(function() {
+          clock.tick(1000*60*60*24*365);
+          return counter.incr();
+        })
+        .then(function() {
+          return counter.incr();
+        })
+        .then(function() {
+          return counter.countRange('year', startNum, endNum);
+        })
+        .then(function(result) {
+          // Check promise
+          expect(result).to.deep.equal(expected);
+
+          // Check callback
+          counter.countRange('year', startNum, endNum, function(err, res) {
+            expect(res).to.deep.equal(expected);
+            done();
+          });
         })
         .catch(done);
     });

@@ -5,7 +5,7 @@
   "main": "lib/metrics.js",
   "scripts": {
     "test": "node_modules/.bin/istanbul cover node_modules/.bin/_mocha",
-    "docs": "node_modules/.bin/jsdoc ./lib/ -r -P ./package.json -d ./docs/"
+    "docs": "node_modules/.bin/jsdoc -c jsdoc.json"
   },
   "repository": {
     "type": "git",
