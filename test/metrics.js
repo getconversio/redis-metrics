@@ -77,6 +77,17 @@ describe('Metric main', function() {
       var counter = metrics.counter('foo', options);
       expect(counter.options).to.equal(options);
     });
+
+    it('should use the default counter options when none are provided', function() {
+      metrics = new RedisMetrics({
+        counterOptions: {
+          timeGranularity: 3
+        }
+      });
+
+      var counter = metrics.counter('foo');
+      expect(counter.options).to.deep.equal(metrics.config.counterOptions);
+    });
   });
 
 });
