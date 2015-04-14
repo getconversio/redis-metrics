@@ -7,7 +7,8 @@ var chai = require('chai'),
     redis = require('redis'),
     moment = require('moment'),
     RedisMetrics = require('../lib/metrics'),
-    TimestampedCounter = require('../lib/counter');
+    TimestampedCounter = require('../lib/counter'),
+    utils = require('../lib/utils');
 
 describe('Counter', function() {
 
@@ -149,11 +150,10 @@ describe('Counter', function() {
     });
 
     it('should call redis incr with a transaction when a time granularity is chosen', function(done) {
-      var multi
       var multiSpy = sandbox.spy(metrics.client, 'multi');
 
       var counter = new TimestampedCounter(metrics, 'foo', {
-        timeGranularity: 1
+        timeGranularity: 'year'
       });
 
       counter.incr().then(function() {
@@ -209,12 +209,34 @@ describe('Counter', function() {
 
     it('should return a list of results from the operation', function(done) {
       var counter = new TimestampedCounter(metrics, 'foo', {
-        timeGranularity: 1
+        timeGranularity: 'year'
       });
 
       counter.incr().then(function(results) {
         expect(results).to.be.instanceof(Array);
         expect(results).to.deep.equal([1, 1]);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should work with an event object', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo');
+
+      counter.incr('bar').then(function(result) {
+        expect(parseInt(result)).to.equal(1);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should work with an event object and time granularity', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      counter.incr('bar').then(function(results) {
+        expect(utils.parseIntArray(results)).to.deep.equal([1, 1]);
         done();
       })
       .catch(done);

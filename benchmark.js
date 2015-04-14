@@ -10,6 +10,11 @@ var hourCounter = metrics.counter('hour', {
   timeGranularity: 'hour'
 });
 
+var eventObjectCounter = metrics.counter('event');
+var eventObjectHourCounter = metrics.counter('eventHour', {
+  timeGranularity: 'hour'
+});
+
 function Test(options) {
   this.name = options.name;
   this.iterations = options.iterations;
@@ -37,7 +42,7 @@ Test.prototype.run = function(onComplete) {
   };
 
   for (var i = 0; i < this.iterations; i++) {
-    this.testFunction(testCallback);
+    this.testFunction(testCallback, i);
   }
 };
 
@@ -80,25 +85,46 @@ tests.push(new Test({
 
 // Counter per user
 
+var users = []
+for (var i = 0; i < 10000; i++) {
+  users.push(crypto.pseudoRandomBytes(16).toString('hex'));
+}
+
 tests.push(new Test({
-  name: 'incr random simple 10000',
+  name: 'incr user counter simple 10000',
   iterations: 10000,
-  testFunction: function(callback) {
+  testFunction: function(callback, iteration) {
     metrics
-      .counter(crypto.pseudoRandomBytes(16).toString('hex'))
+      .counter(users[iteration])
       .incr(callback);
   }
 }));
 
 tests.push(new Test({
-  name: 'incr random hour 10000',
+  name: 'incr user counter hour 10000',
   iterations: 10000,
-  testFunction: function(callback) {
+  testFunction: function(callback, iteration) {
     metrics
-      .counter(crypto.pseudoRandomBytes(16).toString('hex'), {
+      .counter(users[iteration], {
         timeGranularity: 'hour'
       })
       .incr(callback);
+  }
+}));
+
+tests.push(new Test({
+  name: 'incr counter sorted user set 10000',
+  iterations: 10000,
+  testFunction: function(callback, iteration) {
+    eventObjectCounter.incr(users[iteration], callback);
+  }
+}));
+
+tests.push(new Test({
+  name: 'incr hour counter sorted user set 10000',
+  iterations: 10000,
+  testFunction: function(callback, iteration) {
+    eventObjectHourCounter.incr(users[iteration], callback);
   }
 }));
 
