@@ -12,6 +12,13 @@ In a sense, the libary tries to provide sugar-coated method calls for storing
 and fetching Redis data to report counts and trends. The first design goal is to
 make counting simpler.
 
+Not ready for production
+------------------------
+
+**Warning** The APIs for this libary are not finalized and may change and break
+at any time while we are playing around with ideas. Feel free to make
+suggestions and requests :-)
+
 Install
 -------
 
