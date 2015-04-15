@@ -7,7 +7,8 @@ var chai = require('chai'),
     redis = require('redis'),
     moment = require('moment'),
     RedisMetrics = require('../lib/metrics'),
-    TimestampedCounter = require('../lib/counter');
+    TimestampedCounter = require('../lib/counter'),
+    utils = require('../lib/utils');
 
 describe('Counter', function() {
 
@@ -24,11 +25,11 @@ describe('Counter', function() {
     metrics.client.quit(done);
   });
 
-  describe('Constructor', function() {
+  describe('constructor', function() {
 
-    it('should set sane defaults', function() {
+    it('should set some defaults', function() {
       var counter = new TimestampedCounter(metrics, 'foo');
-      expect(counter.key).to.equal('foo');
+      expect(counter.key).to.equal('c:foo');
       expect(counter.metrics).to.equal(metrics);
       expect(counter.options.timeGranularity).to.equal(0);
     });
@@ -52,7 +53,7 @@ describe('Counter', function() {
       var keys = counter.getKeys();
       expect(keys).to.be.instanceof(Array);
       expect(keys).to.have.length.above(0);
-      expect(keys).to.include('foo');
+      expect(keys).to.include('c:foo');
     });
 
     it('should return keys based on the granularity level', function() {
@@ -64,7 +65,7 @@ describe('Counter', function() {
       var keys = counter.getKeys();
       expect(keys).to.be.instanceof(Array);
       expect(keys).to.have.length(1);
-      expect(keys).to.include('foo');
+      expect(keys).to.include('c:foo');
 
       counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
@@ -72,8 +73,8 @@ describe('Counter', function() {
       keys = counter.getKeys();
       expect(keys).to.be.instanceof(Array);
       expect(keys).to.have.length(2);
-      expect(keys).to.include('foo');
-      expect(keys).to.include('foo:2015');
+      expect(keys).to.include('c:foo');
+      expect(keys).to.include('c:foo:2015');
 
       counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'month'
@@ -81,9 +82,9 @@ describe('Counter', function() {
       keys = counter.getKeys();
       expect(keys).to.be.instanceof(Array);
       expect(keys).to.have.length(3);
-      expect(keys).to.include('foo');
-      expect(keys).to.include('foo:2015');
-      expect(keys).to.include('foo:201501');
+      expect(keys).to.include('c:foo');
+      expect(keys).to.include('c:foo:2015');
+      expect(keys).to.include('c:foo:201501');
 
       counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'day'
@@ -91,10 +92,10 @@ describe('Counter', function() {
       keys = counter.getKeys();
       expect(keys).to.be.instanceof(Array);
       expect(keys).to.have.length(4);
-      expect(keys).to.include('foo');
-      expect(keys).to.include('foo:2015');
-      expect(keys).to.include('foo:201501');
-      expect(keys).to.include('foo:20150102');
+      expect(keys).to.include('c:foo');
+      expect(keys).to.include('c:foo:2015');
+      expect(keys).to.include('c:foo:201501');
+      expect(keys).to.include('c:foo:20150102');
 
       counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'hour'
@@ -102,10 +103,10 @@ describe('Counter', function() {
       keys = counter.getKeys();
       expect(keys).to.be.instanceof(Array);
       expect(keys).to.have.length(5);
-      expect(keys).to.include('foo');
-      expect(keys).to.include('foo:2015');
-      expect(keys).to.include('foo:201501');
-      expect(keys).to.include('foo:2015010203');
+      expect(keys).to.include('c:foo');
+      expect(keys).to.include('c:foo:2015');
+      expect(keys).to.include('c:foo:201501');
+      expect(keys).to.include('c:foo:2015010203');
 
       counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'minute'
@@ -113,11 +114,11 @@ describe('Counter', function() {
       keys = counter.getKeys();
       expect(keys).to.be.instanceof(Array);
       expect(keys).to.have.length(6);
-      expect(keys).to.include('foo');
-      expect(keys).to.include('foo:2015');
-      expect(keys).to.include('foo:201501');
-      expect(keys).to.include('foo:2015010203');
-      expect(keys).to.include('foo:201501020304');
+      expect(keys).to.include('c:foo');
+      expect(keys).to.include('c:foo:2015');
+      expect(keys).to.include('c:foo:201501');
+      expect(keys).to.include('c:foo:2015010203');
+      expect(keys).to.include('c:foo:201501020304');
 
       counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'second'
@@ -125,19 +126,19 @@ describe('Counter', function() {
       keys = counter.getKeys();
       expect(keys).to.be.instanceof(Array);
       expect(keys).to.have.length(7);
-      expect(keys).to.include('foo');
-      expect(keys).to.include('foo:2015');
-      expect(keys).to.include('foo:201501');
-      expect(keys).to.include('foo:2015010203');
-      expect(keys).to.include('foo:201501020304');
-      expect(keys).to.include('foo:20150102030405');
+      expect(keys).to.include('c:foo');
+      expect(keys).to.include('c:foo:2015');
+      expect(keys).to.include('c:foo:201501');
+      expect(keys).to.include('c:foo:2015010203');
+      expect(keys).to.include('c:foo:201501020304');
+      expect(keys).to.include('c:foo:20150102030405');
     });
   });
 
   describe('incr', function() {
-    it('should call redis incr without a transaction when no time granularity is chosen', function(done) {
+    it('should call redis incrby without a transaction when no time granularity is chosen', function(done) {
       var multiSpy = sandbox.spy(metrics.client, 'multi');
-      var incrSpy = sandbox.spy(metrics.client, 'incr');
+      var incrSpy = sandbox.spy(metrics.client, 'incrby');
 
       var counter = new TimestampedCounter(metrics, 'foo');
       counter.incr().then(function() {
@@ -148,12 +149,11 @@ describe('Counter', function() {
       .catch(done);
     });
 
-    it('should call redis incr with a transaction when a time granularity is chosen', function(done) {
-      var multi
+    it('should call redis with a transaction when a time granularity is chosen', function(done) {
       var multiSpy = sandbox.spy(metrics.client, 'multi');
 
       var counter = new TimestampedCounter(metrics, 'foo', {
-        timeGranularity: 1
+        timeGranularity: 'year'
       });
 
       counter.incr().then(function() {
@@ -182,7 +182,7 @@ describe('Counter', function() {
     });
 
     it('should call the callback on error', function(done) {
-      var mock = sandbox.stub(metrics.client, 'incr')
+      var mock = sandbox.stub(metrics.client, 'incrby')
         .yields(new Error('oh no'), null);
 
       var counter = new TimestampedCounter(metrics, 'foo');
@@ -194,7 +194,7 @@ describe('Counter', function() {
     });
 
     it('should reject the promise on error', function(done) {
-      var mock = sandbox.stub(metrics.client, 'incr')
+      var mock = sandbox.stub(metrics.client, 'incrby')
         .yields(new Error('oh no'), null);
 
       var counter = new TimestampedCounter(metrics, 'foo');
@@ -209,12 +209,143 @@ describe('Counter', function() {
 
     it('should return a list of results from the operation', function(done) {
       var counter = new TimestampedCounter(metrics, 'foo', {
-        timeGranularity: 1
+        timeGranularity: 'year'
       });
 
       counter.incr().then(function(results) {
         expect(results).to.be.instanceof(Array);
         expect(results).to.deep.equal([1, 1]);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should work with an event object', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo');
+
+      counter.incr('bar').then(function(result) {
+        expect(parseInt(result)).to.equal(1);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should work with an event object and time granularity', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      counter.incr('bar').then(function(results) {
+        expect(utils.parseIntArray(results)).to.deep.equal([1, 1]);
+        done();
+      })
+      .catch(done);
+    });
+
+  });
+
+  describe('incrby', function() {
+    it('should call redis incrby without a transaction when no time granularity is chosen', function(done) {
+      var multiSpy = sandbox.spy(metrics.client, 'multi');
+      var incrSpy = sandbox.spy(metrics.client, 'incrby');
+
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.incrby(2).then(function() {
+        sinon.assert.calledOnce(incrSpy);
+        sinon.assert.notCalled(multiSpy);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should call redis with a transaction when a time granularity is chosen', function(done) {
+      var multiSpy = sandbox.spy(metrics.client, 'multi');
+
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      counter.incrby(3).then(function() {
+        sinon.assert.calledOnce(multiSpy);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should call the callback on success', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.incrby(4, function(err, result) {
+        expect(err).to.be.null;
+        expect(result).to.equal(4);
+        done();
+      });
+    });
+
+    it('should resolve a promise on success', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.incrby(5).then(function(result) {
+        expect(result).to.equal(5);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should call the callback on error', function(done) {
+      var mock = sandbox.stub(metrics.client, 'incrby')
+        .yields(new Error('oh no'), null);
+
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.incrby(6, function(err, result) {
+        expect(err).to.not.be.null;
+        expect(result).to.be.null;
+        done();
+      });
+    });
+
+    it('should reject the promise on error', function(done) {
+      var mock = sandbox.stub(metrics.client, 'incrby')
+        .yields(new Error('oh no'), null);
+
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.incrby(7).then(function() {
+        done(new Error('Should not be here'));
+      })
+      .catch(function(err) {
+        expect(err).to.not.be.null;
+        done();
+      });
+    });
+
+    it('should return a list of results from the operation', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      counter.incrby(8).then(function(results) {
+        expect(results).to.be.instanceof(Array);
+        expect(results).to.deep.equal([8, 8]);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should work with an event object', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo');
+
+      counter.incrby(9, 'bar').then(function(result) {
+        expect(parseInt(result)).to.equal(9);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should work with an event object and time granularity', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      counter.incrby(10, 'bar').then(function(results) {
+        expect(utils.parseIntArray(results)).to.deep.equal([10, 10]);
         done();
       })
       .catch(done);
@@ -251,6 +382,20 @@ describe('Counter', function() {
       });
     });
 
+    it('should work with time granularity, event object and callback', function(done) {
+      var mock = sandbox.mock(metrics.client)
+        .expects('zscore')
+        .once()
+        .yields(null, '10');
+
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.count('none', 'bar', function(err, result) {
+        mock.verify();
+        expect(result).to.equal(10);
+        done(err);
+      });
+    });
+
     it('should return a single result when no arguments are given', function(done) {
       var counter = new TimestampedCounter(metrics, 'foo');
       counter.incr()
@@ -269,6 +414,40 @@ describe('Counter', function() {
           done();
         })
         .catch(done);
+    });
+
+    it('should return a single result for an event object', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.incr('bar')
+        .then(function() {
+          return counter.incr('bar');
+        })
+        .then(function() {
+          return counter.incr('bar');
+        })
+        .then(function() {
+          return counter.count('total', 'bar');
+        })
+        .then(function(result) {
+          // Counter has been incremented 3 times.
+          expect(result).to.equal(3);
+          done();
+        })
+        .catch(done);
+    });
+
+    it('should return 0 when the key does not exist (callback)', function(done) {
+      var mock = sandbox.mock(metrics.client)
+        .expects('get')
+        .once()
+        .yields(null, null);
+
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.count(function(err, result) {
+        mock.verify();
+        expect(result).to.equal(0);
+        done(err);
+      })
     });
 
     it('should return 0 when the key does not exist (promise)', function(done) {
@@ -314,6 +493,34 @@ describe('Counter', function() {
         })
         .catch(done);
     });
+
+    it('should return a count for a specific time granularity and event object', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      // Increment in 2014 and 2015
+      // Total should be 2 but year should be 1.
+
+      var clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
+      counter.incr('bar')
+        .then(function() {
+          clock.tick(1000*60*60*24*365);
+          return counter.incr('bar');
+        })
+        .then(function() {
+          return counter.count('none', 'bar');
+        })
+        .then(function(result) {
+          expect(result).to.equal(2);
+          return counter.count('year', 'bar');
+        })
+        .then(function(result) {
+          expect(result).to.equal(1);
+          done();
+        })
+        .catch(done);
+    });
   });
 
   describe('countRange', function() {
@@ -348,6 +555,82 @@ describe('Counter', function() {
 
           // Check callback
           counter.countRange('year', start, end, function(err, res) {
+            expect(res).to.deep.equal(expected);
+            done();
+          });
+        })
+        .catch(done);
+    });
+
+    it('should return a range of counts at the second level', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'second'
+      });
+
+      // Increment 2014 once and 2015 twice
+
+      var start = moment.utc({ year: 2015, second: 0 });
+      var end = moment.utc({ year: 2015, second: 1 });
+      var expected = {};
+      expected[start.format()] = 1;
+      expected[end.format()] = 2;
+
+      var clock = sandbox.useFakeTimers(new Date('2015-01-01').getTime());
+      counter.incr()
+        .then(function() {
+          clock.tick(1000);
+          return counter.incr();
+        })
+        .then(function() {
+          return counter.incr();
+        })
+        .then(function() {
+          return counter.countRange('second', start, end);
+        })
+        .then(function(result) {
+          // Check promise
+          expect(result).to.deep.equal(expected);
+
+          // Check callback
+          counter.countRange('second', start, end, function(err, res) {
+            expect(res).to.deep.equal(expected);
+            done();
+          });
+        })
+        .catch(done);
+    });
+
+    it('should return a range of count for an event object', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      // Increment 2014 once and 2015 twice
+
+      var start = moment.utc({ year: 2014 });
+      var end = moment.utc({ year: 2015 });
+      var expected = {};
+      expected[start.format()] = 1;
+      expected[end.format()] = 2;
+
+      var clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
+      counter.incr('bar')
+        .then(function() {
+          clock.tick(1000*60*60*24*365);
+          return counter.incr('bar');
+        })
+        .then(function() {
+          return counter.incr('bar');
+        })
+        .then(function() {
+          return counter.countRange('year', start, end, 'bar');
+        })
+        .then(function(result) {
+          // Check promise
+          expect(result).to.deep.equal(expected);
+
+          // Check callback
+          counter.countRange('year', start, end, 'bar', function(err, res) {
             expect(res).to.deep.equal(expected);
             done();
           });
@@ -416,6 +699,37 @@ describe('Counter', function() {
 
           // Check callback
           counter.countRange('year', start, end, function(err, res) {
+            expect(res).to.deep.equal(expected);
+            done();
+          });
+        })
+        .catch(done);
+    });
+
+    it('should return 0 for counters where no data is registed for the event object', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      // Increment 2014 once.
+
+      var start = moment.utc({ year: 2014 });
+      var end = moment.utc({ year: 2015 });
+      var expected = {};
+      expected[start.format()] = 1;
+      expected[end.format()] = 0;
+
+      var clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
+      counter.incr('bar')
+        .then(function() {
+          return counter.countRange('year', start, end, 'bar');
+        })
+        .then(function(result) {
+          // Check promise
+          expect(result).to.deep.equal(expected);
+
+          // Check callback
+          counter.countRange('year', start, end, 'bar', function(err, res) {
             expect(res).to.deep.equal(expected);
             done();
           });
