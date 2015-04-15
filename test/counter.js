@@ -149,7 +149,7 @@ describe('Counter', function() {
       .catch(done);
     });
 
-    it('should call redis incr with a transaction when a time granularity is chosen', function(done) {
+    it('should call redis with a transaction when a time granularity is chosen', function(done) {
       var multiSpy = sandbox.spy(metrics.client, 'multi');
 
       var counter = new TimestampedCounter(metrics, 'foo', {
@@ -258,7 +258,7 @@ describe('Counter', function() {
       .catch(done);
     });
 
-    it('should call redis incr with a transaction when a time granularity is chosen', function(done) {
+    it('should call redis with a transaction when a time granularity is chosen', function(done) {
       var multiSpy = sandbox.spy(metrics.client, 'multi');
 
       var counter = new TimestampedCounter(metrics, 'foo', {
@@ -555,6 +555,44 @@ describe('Counter', function() {
 
           // Check callback
           counter.countRange('year', start, end, function(err, res) {
+            expect(res).to.deep.equal(expected);
+            done();
+          });
+        })
+        .catch(done);
+    });
+
+    it('should return a range of counts at the second level', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'second'
+      });
+
+      // Increment 2014 once and 2015 twice
+
+      var start = moment.utc({ year: 2015, second: 0 });
+      var end = moment.utc({ year: 2015, second: 1 });
+      var expected = {};
+      expected[start.format()] = 1;
+      expected[end.format()] = 2;
+
+      var clock = sandbox.useFakeTimers(new Date('2015-01-01').getTime());
+      counter.incr()
+        .then(function() {
+          clock.tick(1000);
+          return counter.incr();
+        })
+        .then(function() {
+          return counter.incr();
+        })
+        .then(function() {
+          return counter.countRange('second', start, end);
+        })
+        .then(function(result) {
+          // Check promise
+          expect(result).to.deep.equal(expected);
+
+          // Check callback
+          counter.countRange('second', start, end, function(err, res) {
             expect(res).to.deep.equal(expected);
             done();
           });
