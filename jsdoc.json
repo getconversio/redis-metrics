@@ -2,6 +2,12 @@
   "source": {
     "include": [ "lib/" ]
   },
+  "templates": {
+    "cleverLinks": true
+  },
+  "plugins": [
+    "plugins/markdown"
+  ],
   "opts": {
     "destination": "out/",
     "recurse": true,
