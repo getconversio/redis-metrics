@@ -72,21 +72,21 @@ describe('Metric main', function() {
 
     it('should pass the options object to the counter constructor', function() {
       var options = {
-        timeGranularity: 'hour'
+        timeGranularity: 1
       };
       var counter = metrics.counter('foo', options);
-      expect(counter.options).to.equal(options);
+      expect(counter.options.timeGranularity).to.equal(1);
     });
 
     it('should use the default counter options when none are provided', function() {
       metrics = new RedisMetrics({
         counterOptions: {
-          timeGranularity: 3
+          timeGranularity: 2
         }
       });
 
       var counter = metrics.counter('foo');
-      expect(counter.options).to.deep.equal(metrics.config.counterOptions);
+      expect(counter.options.timeGranularity).to.equal(2);
     });
   });
 
