@@ -8,7 +8,7 @@ var util = require('util'),
     crypto = require('crypto'),
     sinon = require('sinon'),
     async = require('async'),
-    RedisMetrics = require('./lib/metrics');
+    RedisMetrics = require('../lib/metrics');
 
 var metrics = new RedisMetrics();
 var counter = metrics.counter('impression', {

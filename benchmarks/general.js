@@ -6,7 +6,7 @@
 
 var util = require('util'),
     crypto = require('crypto'),
-    RedisMetrics = require('./lib/metrics');
+    RedisMetrics = require('../lib/metrics');
 
 var metrics = new RedisMetrics();
 var simpleCounter = metrics.counter('simple');
