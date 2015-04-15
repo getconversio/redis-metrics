@@ -89,7 +89,7 @@ tests.push(new Test({
 
 // Counter per user
 
-var users = []
+var users = [];
 for (var i = 0; i < 10000; i++) {
   users.push(crypto.pseudoRandomBytes(16).toString('hex'));
 }

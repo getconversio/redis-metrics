@@ -4,8 +4,7 @@
  * Benchmark to push the memory.
  */
 
-var util = require('util'),
-    crypto = require('crypto'),
+var crypto = require('crypto'),
     sinon = require('sinon'),
     async = require('async'),
     RedisMetrics = require('../lib/metrics');
@@ -28,8 +27,6 @@ var hours = [];
 for (var hour = 0; hour < 24; hour++) {
   hours.push(hour);
 }
-
-var currentHour = 0;
 
 var clock = sinon.useFakeTimers();
 async.eachSeries(hours, function(hour, hourDone) {
