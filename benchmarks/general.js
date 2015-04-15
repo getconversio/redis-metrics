@@ -1,5 +1,9 @@
 'use strict';
 
+/**
+ * General performance benchmarks
+ */
+
 var util = require('util'),
     crypto = require('crypto'),
     RedisMetrics = require('./lib/metrics');
