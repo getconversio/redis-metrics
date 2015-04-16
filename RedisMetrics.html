@@ -49,7 +49,7 @@
 
 
 <div class="description">
-    A simple metrics utility for Redis.
+    <p>A simple metrics utility for Redis.</p>
 </div>
 
 
@@ -113,7 +113,7 @@
 
             
 
-            <td class="description last">configuration options
+            <td class="description last"><p>configuration options</p>
                 <h6>Properties</h6>
                 
 
@@ -167,7 +167,7 @@
 
             
 
-            <td class="description last">The Redis host to use.</td>
+            <td class="description last"><p>The Redis host to use.</p></td>
         </tr>
 
     
@@ -200,7 +200,7 @@
 
             
 
-            <td class="description last">The Redis port to use.</td>
+            <td class="description last"><p>The Redis port to use.</p></td>
         </tr>
 
     
@@ -233,7 +233,41 @@
 
             
 
-            <td class="description last">The Redis options to use.</td>
+            <td class="description last"><p>The Redis options to use.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>counterOptions</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"><p>Default counter options to use if
+none are provided when creating a counter. See <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</code></a></p></td>
         </tr>
 
     
@@ -281,7 +315,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="metrics.js.html">metrics.js</a>, <a href="metrics.js.html#line15">line 15</a>
+        <a href="metrics.js.html">metrics.js</a>, <a href="metrics.js.html#line18">line 18</a>
     </li></ul></dd>
     
 
@@ -337,13 +371,12 @@
 
 
 <div class="description">
-    Returns a timestamped counter for the given event.
-
-If the counter is initialized without options, it works like a normal event
+    <p>Returns a timestamped counter for the given event.</p>
+<p>If the counter is initialized without options, it works like a normal event
 counter that tracks a total count for the given event key. If a time
 granularity option is specified, the counter will be able to report
 aggregated counters based on time intervals down to the level of granularity
-that is chosen.
+that is chosen.</p>
 </div>
 
 
@@ -405,7 +438,7 @@ that is chosen.
 
             
 
-            <td class="description last">The event that we want to count for.</td>
+            <td class="description last"><p>The event that we want to count for.</p></td>
         </tr>
 
     
@@ -438,7 +471,7 @@ that is chosen.
 
             
 
-            <td class="description last">The options to use for the counter
+            <td class="description last"><p>The options to use for the counter</p>
                 <h6>Properties</h6>
                 
 
@@ -455,6 +488,8 @@ that is chosen.
         <th>Attributes</th>
         
 
+        
+        <th>Default</th>
         
 
         <th class="last">Description</th>
@@ -491,10 +526,56 @@ that is chosen.
             
 
             
+                <td class="default">
+                
+                    'none'
+                
+                </td>
+            
 
-            <td class="description last">Makes the counter use timestamps
-which means that it can be used to measure event metrics based on time
-intervals.</td>
+            <td class="description last"><p>Makes the counter use
+  timestamps which means that it can be used to measure event metrics based
+  on time intervals. The default is to not use time granularities.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>expireKeys</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    true
+                
+                </td>
+            
+
+            <td class="description last"><p>Automatically expire keys.
+  Useful for high time granularity levels to preserve memory.</p></td>
         </tr>
 
     
@@ -517,6 +598,9 @@ intervals.</td>
 
     
 
+    
+    <dt class="tag-since">Since:</dt>
+    <dd class="tag-since"><ul class="dummy"><li>0.1.0</li></ul></dd>
     
 
     
@@ -542,7 +626,7 @@ intervals.</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="metrics.js.html">metrics.js</a>, <a href="metrics.js.html#line47">line 47</a>
+        <a href="metrics.js.html">metrics.js</a>, <a href="metrics.js.html#line53">line 53</a>
     </li></ul></dd>
     
 
@@ -602,13 +686,13 @@ intervals.</td>
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-constants.html">constants</a></li><li><a href="module-utils.html">utils</a></li></ul><h3>Classes</h3><ul><li><a href="RedisMetrics.html">RedisMetrics</a></li><li><a href="TimestampedCounter.html">TimestampedCounter</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-constants.html">constants</a></li></ul><h3>Classes</h3><ul><li><a href="RedisMetrics.html">RedisMetrics</a></li><li><a href="TimestampedCounter.html">TimestampedCounter</a></li></ul><h3>Tutorials</h3><ul><li><a href="tutorial-counting.html">Counting stuff</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-beta3</a> on Mon Apr 13 2015 16:42:48 GMT+0200 (CEST)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-beta3</a> on Thu Apr 16 2015 15:20:24 GMT+0200 (CEST)
 </footer>
 
 <script> prettyPrint(); </script>

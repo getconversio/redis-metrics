@@ -32,14 +32,48 @@ var _ = require('lodash'),
     Q = require('q'),
     moment = require('moment'),
     timeGranularities = require('./constants').timeGranularities,
-    utils = require('./utils');
+    utils = require('./utils'),
+    lua = require('./lua');
+
+// The default expiration times aim at having less than 800 counters for a
+// given counter key (event) since the counter keys are stored with a specific
+// timestamp. For example, second-based counters expire after 10 minutes which
+// means that there will be 600 counter keys in the worst-case for a single
+// event.
+var defaultExpiration = {
+  total: -1,
+  year: -1,
+  month:  10 * 365 * 24 * 60 * 60, // 10 years = 120 counters worst-case
+  day:  2 * 365 * 24 * 60 * 60,    // 2 years = 730 counters worst-case
+  hour:  31 * 24 * 60 * 60,        // 31 days = 744 counters worst-case
+  minute:  12 * 60 * 60,           // 12 hours = 720 counters worst-case
+  second:  10 * 60                 // 10 minutes = 600 counters worst-case
+};
+// BTW, good luck keeping your Redis server around for 10 years :-)
+
+// Translate the "nice looking expiration times above to "real" keys that
+// correspond to time granularities.
+_.keys(defaultExpiration).forEach(function(key) {
+  var newKey = timeGranularities[key];
+  var value = defaultExpiration[key];
+  delete defaultExpiration[key];
+  defaultExpiration[newKey] = value;
+});
 
 var defaults = {
-  timeGranularity: timeGranularities.none
+  timeGranularity: timeGranularities.none,
+  expireKeys: true,
+  expiration: defaultExpiration
 };
 
 var momentFormat = 'YYYYMMDDHHmmss';
 
+/**
+ * Convert the given granularity level into the internal representation (a
+ * number).
+ * @returns {module:constants~timeGranularities}
+ * @private
+ */
 var parseTimeGranularity = function(timeGranularity) {
   timeGranularity = timeGranularities[timeGranularity];
   if (timeGranularity) return timeGranularity;
@@ -62,9 +96,6 @@ var createRangeParser = function(keyRange) {
 /**
  * A timestamped event counter.
  *
- * This constructor is usually not called directly but through the
- * {@link RedisMetrics#counter} function.
- *
  * The timestamped counter stores one or more Redis keys based on the given
  * event name and time granularity appends a timestamp to the key before
  * storing the key in Redis. The counter can then report an overall aggregated
@@ -75,15 +106,29 @@ var createRangeParser = function(keyRange) {
  * just like a global counter for the given key, i.e. events will not be
  * timestamped.
  *
+ * **Notice**: The constructor for this class is usually not called directly
+ * but through the {@link RedisMetrics#counter} function.
+ *
  * @param {RedisMetrics} metrics - An instance of a RedisMetrics client.
  * @param {string} key - The base key to use for this counter.
+ * @param {Object} options - The options to use for this counter. The available
+ *   options are specified in {@link RedisMetrics#counter}.
  * @class
  */
 function TimestampedCounter(metrics, key, options) {
   this.metrics = metrics;
-  this.key = key;
+  this.key = 'c:' + key; // Pre-prend c to indicate it's a counter.
   this.options = options || {};
-  _.defaults(this.options, defaults);
+  _.defaults(this.options, _.cloneDeep(defaults));
+
+  // Translate the expiration keys of the options.
+  var _this = this;
+  _.keys(this.options.expiration).forEach(function(key) {
+    var newKey = timeGranularities[key];
+    var value = _this.options.expiration[key];
+    delete _this.options.expiration[key];
+    _this.options.expiration[newKey] = value;
+  });
 
   this.options.timeGranularity =
     parseTimeGranularity(this.options.timeGranularity);
@@ -95,7 +140,8 @@ function TimestampedCounter(metrics, key, options) {
  * @returns {Array}
  */
 TimestampedCounter.prototype.getKeys = function() {
-  var keys = [this.key]; // Always add the key itself.
+  // Always add the key itself.
+  var keys = [this.key];
 
   // If no time granularity is chosen, the timestamped keys will not be used so
   // just return the default key.
@@ -111,28 +157,126 @@ TimestampedCounter.prototype.getKeys = function() {
 };
 
 /**
+ * Finds the configured time to live for the given key.
+ * @param {string} key - The full key (including timestamp) for the key to
+ *   determine the ttl for.
+ * @returns {number} Number of seconds that the key should live.
+ */
+TimestampedCounter.prototype.getKeyTTL = function(key) {
+  if (!this.options.expireKeys) return -1;
+
+  var timePart = key.replace(this.key, '').split(':')[1] || '';
+  var timeGranularity = timeGranularities.none;
+  switch (timePart.length) {
+    case 4:
+      timeGranularity = timeGranularities.year;
+      break;
+    case 6:
+      timeGranularity = timeGranularities.month;
+      break;
+    case 8:
+      timeGranularity = timeGranularities.day;
+      break;
+    case 10:
+      timeGranularity = timeGranularities.hour;
+      break;
+    case 12:
+      timeGranularity = timeGranularities.minute;
+      break;
+    case 14:
+      timeGranularity = timeGranularities.second;
+      break;
+  }
+  var ttl = this.options.expiration[timeGranularity];
+  if (typeof ttl === 'undefined') ttl = defaultExpiration[timeGranularity];
+  return ttl;
+};
+
+/**
  * Increments this counter with 1.
  *
+ * For some use cases, it makes sense to pass in an event object to get more
+ * precise statistics for a specific event. For example, when counting page
+ * views on a page, it makes sense to increment a counter per specific page.
+ * For this use case, the eventObj parameter is a good fit.
+ *
+ * @param {Object|string} [eventObj] - Extra event information used to
+ *   determine what counter to increment.
  * @param {function} [callback] - Optional callback.
  * @returns {Promise} A promise that resolves to the results from Redis. Can
- * be used instead of the callback function.
+ *   be used instead of the callback function.
+ * @since 0.1.0
  */
-TimestampedCounter.prototype.incr = function(callback) {
+TimestampedCounter.prototype.incr = function(eventObj, callback) {
+  return this.incrby(1, eventObj, callback);
+};
+
+/**
+ * Increments this counter with the given amount.
+ *
+ * @param {number} amount - The amount to increment with.
+ * @param {Object|string} [eventObj] - Extra event information used to
+ *   determine what counter to increment. See {@link TimestampedCounter#incr}.
+ * @param {function} [callback] - Optional callback.
+ * @returns {Promise} A promise that resolves to the results from Redis. Can
+ *   be used instead of the callback function.
+ * @see {@link TimestampedCounter#incr}
+ * @since 0.2.0
+ */
+TimestampedCounter.prototype.incrby = function(amount, eventObj, callback) {
+  // The event object is optional so it might be a callback.
+  if (_.isFunction(eventObj)) {
+    callback = eventObj;
+    eventObj = null;
+  }
+  if (eventObj) eventObj = String(eventObj);
   var deferred = Q.defer();
   var cb = utils.createRedisCallback(deferred, callback);
+  this._incrby(amount, eventObj, cb);
+  return deferred.promise;
+};
 
-  var keysToIncrement = this.getKeys();
-  if (keysToIncrement.length === 1) {
-    this.metrics.client.incr(keysToIncrement[0], cb);
+var incrSingle = function(client, key, amount, eventObj, ttl, cb) {
+  if (eventObj) {
+    key += ':z';
+
+    if (ttl > 0) {
+      if (cb) client.eval(lua.zincrbyExpire, 1, key, amount, eventObj, ttl, cb);
+      else client.eval(lua.zincrbyExpire, 1, key, amount, eventObj, ttl);
+    }
+    else {
+      if (cb) client.zincrby(key, amount, eventObj, cb);
+      else client.zincrby(key, amount, eventObj);
+    }
+
+  } else { // No event object
+
+    if (ttl > 0) {
+      if (cb) client.eval(lua.incrbyExpire, 1, key, amount, ttl, cb);
+      else client.eval(lua.incrbyExpire, 1, key, amount, ttl);
+    }
+    else {
+      if (cb) client.incrby(key, amount, cb);
+      else client.incrby(key, amount);
+    }
+  }
+};
+
+TimestampedCounter.prototype._incrby = function(amount, eventObj, cb) {
+  var keys = this.getKeys();
+  // Optimize for the case where there is only a single key to increment.
+  if (keys.length === 1) {
+    var ttl = this.getKeyTTL(keys[0]);
+    incrSingle(this.metrics.client, keys[0], amount, eventObj, ttl, cb);
   } else {
     var multi = this.metrics.client.multi();
-    keysToIncrement.forEach(function(key) {
-      multi.incr(key);
+    var _this = this;
+    keys.forEach(function(key) {
+      var ttl = _this.getKeyTTL(key);
+      incrSingle(multi, key, amount, eventObj, ttl);
     });
     multi.exec(cb);
   }
-
-  return deferred.promise;
 };
 
 /**
@@ -142,6 +286,9 @@ TimestampedCounter.prototype.incr = function(callback) {
  * value at the given granularity level. Effectively, this provides a single
  * answer to questions such as "what is the count for the current day".
  *
+ * **Notice**: Counts cannot be returned for a given time granularity if it was
+ * not incremented at this granularity level in the first place.
+ *
  * @example
  * myCounter.count(function(err, result) {
  *   console.log(result); // Outputs the global count
@@ -150,29 +297,54 @@ TimestampedCounter.prototype.incr = function(callback) {
  * myCounter.count('year', function(err, result) {
  *   console.log(result); // Outputs the count for the current year
  * });
+ * @example
+ * myCounter.count('year', '/foo.html', function(err, result) {
+ *   // Outputs the count for the current year for the event object '/foo.html'
+ *   console.log(result);
+ * });
  *
- * @param {module:constants~timeGranularities} [timeGranularity] - The
- * granularity level to report the count for.
+ * @param {module:constants~timeGranularities} [timeGranularity='total'] - The
+ *   granularity level to report the count for.
+ * @param {string|object} [eventObj] - The event object. See
+ *   {@link TimestampedCounter#incr} for more info on event objects.
  * @param {function} [callback] - Optional callback.
  * @returns {Promise} A promise that resolves to the result from Redis. Can
- * be used instead of the callback function.
+ *   be used instead of the callback function.
+ * @since 0.1.0
  */
-TimestampedCounter.prototype.count = function(timeGranularity, callback) {
-  if (typeof timeGranularity === 'function') {
-    callback = timeGranularity;
-    timeGranularity = timeGranularities.none;
-  } else {
-    timeGranularity = parseTimeGranularity(timeGranularity);
-  }
+TimestampedCounter.prototype.count = function(
+    timeGranularity, eventObj, callback) {
+  var args = Array.prototype.slice.call(arguments);
+
+  // Last argument is callback;
+  callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+
+  // Event object requires that the time granularity is specified, otherwise we
+  // can't reliably distinguish between them because both the eventObj and time
+  // granularity can be strings. I miss Python.
+  eventObj = args.length > 1 ? args.pop() : null;
+
+  // Still any arguments left? That's a time granularity.
+  timeGranularity = args.length > 0 ? args.pop() : 'none';
+  timeGranularity = parseTimeGranularity(timeGranularity);
 
   var deferred = Q.defer();
   var cb = utils.createRedisCallback(deferred, callback, utils.parseInt);
-  this.metrics.client.get(this.getKeys()[timeGranularity], cb);
+  this._count(timeGranularity, eventObj, cb);
   return deferred.promise;
 };
 
+TimestampedCounter.prototype._count = function(timeGranularity, eventObj, cb) {
+  var theKey = this.getKeys()[timeGranularity];
+  if (eventObj) {
+    this.metrics.client.zscore(theKey + ':z', eventObj, cb);
+  } else {
+    this.metrics.client.get(theKey, cb);
+  }
+};
+
 /**
- * Returns a object mapping timestamps to counts in the given time range at a
+ * Returns an object mapping timestamps to counts in the given time range at a
  * specific time granularity level.
  *
  * Notice: This function does not make sense for the "none" time granularity.
@@ -185,19 +357,27 @@ TimestampedCounter.prototype.count = function(timeGranularity, callback) {
  * @param {Date|Object|string|number} [endDate=new Date()] - End date for the
  *   range (inclusive). Accepts the same arguments as the constructor of a
  *   {@link http://momentjs.com/|moment} date.
+ * @param {string|object} [eventObj] - The event object. See
+ *   {@link TimestampedCounter#incr} for more info on event objects.
  * @param {function} [callback] - Optional callback.
  * @returns {Promise} A promise that resolves to the result from Redis. Can
  *   be used instead of the callback function.
+ * @since 0.1.0
  */
-TimestampedCounter.prototype.countRange =
-    function(timeGranularity, startDate, endDate, callback) {
+TimestampedCounter.prototype.countRange = function(
+    timeGranularity, startDate, endDate, eventObj, callback) {
   timeGranularity = parseTimeGranularity(timeGranularity);
-  if (typeof endDate === 'function') {
+  if (_.isFunction(eventObj)) {
+    callback = eventObj;
+    eventObj = null;
+  }
+  else if (_.isFunction(endDate)) {
     callback = endDate;
     endDate = moment.utc();
   } else {
     endDate = endDate || moment.utc();
   }
+  if (eventObj) eventObj = String(eventObj);
 
   var momentRange = utils.momentRange(startDate, endDate, timeGranularity);
   var _this = this;
@@ -208,8 +388,8 @@ TimestampedCounter.prototype.countRange =
   // the returned data object.
   momentRange.forEach(function(m) {
     // Redis key range
-    keyRange.push(
-      _this.key + ':' + m.format(momentFormat).slice(0, timeGranularity*2+2));
+    var mKeyFormat = m.format(momentFormat).slice(0, timeGranularity*2+2);
+    keyRange.push(_this.key + ':' + mKeyFormat);
 
     // Timestamp range. Use ISO format for easy parsing back to a timestamp.
     momentKeyRange.push(m.format());
@@ -219,9 +399,21 @@ TimestampedCounter.prototype.countRange =
   var rangeParser = createRangeParser(momentKeyRange);
   var cb = utils.createRedisCallback(deferred, callback, rangeParser);
 
-  this.metrics.client.mget(keyRange, cb);
+  this._countRange(keyRange, eventObj, cb);
 
   return deferred.promise;
+};
+
+TimestampedCounter.prototype._countRange = function(keys, eventObj, cb) {
+  if (eventObj) {
+    var multi = this.metrics.client.multi();
+    keys.forEach(function(key) {
+      multi.zscore(key + ':z', eventObj);
+    });
+    multi.exec(cb);
+  } else {
+    this.metrics.client.mget(keys, cb);
+  }
 };
 
 module.exports = TimestampedCounter;
@@ -235,13 +427,13 @@ module.exports = TimestampedCounter;
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-constants.html">constants</a></li><li><a href="module-utils.html">utils</a></li></ul><h3>Classes</h3><ul><li><a href="RedisMetrics.html">RedisMetrics</a></li><li><a href="TimestampedCounter.html">TimestampedCounter</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-constants.html">constants</a></li></ul><h3>Classes</h3><ul><li><a href="RedisMetrics.html">RedisMetrics</a></li><li><a href="TimestampedCounter.html">TimestampedCounter</a></li></ul><h3>Tutorials</h3><ul><li><a href="tutorial-counting.html">Counting stuff</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-beta3</a> on Mon Apr 13 2015 16:42:48 GMT+0200 (CEST)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-beta3</a> on Thu Apr 16 2015 15:20:24 GMT+0200 (CEST)
 </footer>
 
 <script> prettyPrint(); </script>

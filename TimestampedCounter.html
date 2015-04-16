@@ -42,27 +42,24 @@
 
     
 
-    <h4 class="name" id="TimestampedCounter"><span class="type-signature"></span>new TimestampedCounter<span class="signature">(metrics, key)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="TimestampedCounter"><span class="type-signature"></span>new TimestampedCounter<span class="signature">(metrics, key, options)</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    A timestamped event counter.
-
-This constructor is usually not called directly but through the
-<a href="RedisMetrics.html#counter">RedisMetrics#counter</a> function.
-
-The timestamped counter stores one or more Redis keys based on the given
+    <p>A timestamped event counter.</p>
+<p>The timestamped counter stores one or more Redis keys based on the given
 event name and time granularity appends a timestamp to the key before
 storing the key in Redis. The counter can then report an overall aggregated
 count or a specific count for a time range, depending on the chosen
-granularity of the timestamp.
-
-If no time granularity is chosen at creation time, the counter will work
+granularity of the timestamp.</p>
+<p>If no time granularity is chosen at creation time, the counter will work
 just like a global counter for the given key, i.e. events will not be
-timestamped.
+timestamped.</p>
+<p><strong>Notice</strong>: The constructor for this class is usually not called directly
+but through the <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</code></a> function.</p>
 </div>
 
 
@@ -114,7 +111,7 @@ timestamped.
 
             
 
-            <td class="description last">An instance of a RedisMetrics client.</td>
+            <td class="description last"><p>An instance of a RedisMetrics client.</p></td>
         </tr>
 
     
@@ -137,7 +134,31 @@ timestamped.
 
             
 
-            <td class="description last">The base key to use for this counter.</td>
+            <td class="description last"><p>The base key to use for this counter.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>The options to use for this counter. The available
+  options are specified in <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</code></a>.</p></td>
         </tr>
 
     
@@ -178,7 +199,7 @@ timestamped.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line54">line 54</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line90">line 90</a>
     </li></ul></dd>
     
 
@@ -227,18 +248,19 @@ timestamped.
 
     
 
-    <h4 class="name" id="count"><span class="type-signature"></span>count<span class="signature">(timeGranularity<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id="count"><span class="type-signature"></span>count<span class="signature">(timeGranularity<span class="signature-attributes">opt</span>, eventObj<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
 
 
 <div class="description">
-    Returns the current count for this counter.
-
-If a specific time granularity is given, the value returned is the current
+    <p>Returns the current count for this counter.</p>
+<p>If a specific time granularity is given, the value returned is the current
 value at the given granularity level. Effectively, this provides a single
-answer to questions such as "what is the count for the current day".
+answer to questions such as &quot;what is the count for the current day&quot;.</p>
+<p><strong>Notice</strong>: Counts cannot be returned for a given time granularity if it was
+not incremented at this granularity level in the first place.</p>
 </div>
 
 
@@ -265,6 +287,8 @@ answer to questions such as "what is the count for the current day".
         <th>Attributes</th>
         
 
+        
+        <th>Default</th>
         
 
         <th class="last">Description</th>
@@ -301,9 +325,56 @@ answer to questions such as "what is the count for the current day".
             
 
             
+                <td class="default">
+                
+                    'total'
+                
+                </td>
+            
 
-            <td class="description last">The
-granularity level to report the count for.</td>
+            <td class="description last"><p>The
+  granularity level to report the count for.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>eventObj</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+|
+
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"><p>The event object. See
+  <a href="TimestampedCounter.html#incr"><code>TimestampedCounter#incr</code></a> for more info on event objects.</p></td>
         </tr>
 
     
@@ -335,8 +406,12 @@ granularity level to report the count for.</td>
             
 
             
+                <td class="default">
+                
+                </td>
+            
 
-            <td class="description last">Optional callback.</td>
+            <td class="description last"><p>Optional callback.</p></td>
         </tr>
 
     
@@ -352,6 +427,9 @@ granularity level to report the count for.</td>
 
     
 
+    
+    <dt class="tag-since">Since:</dt>
+    <dd class="tag-since"><ul class="dummy"><li>0.1.0</li></ul></dd>
     
 
     
@@ -377,7 +455,7 @@ granularity level to report the count for.</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line132">line 132</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line287">line 287</a>
     </li></ul></dd>
     
 
@@ -404,8 +482,8 @@ granularity level to report the count for.</td>
 
         
 <div class="param-desc">
-    A promise that resolves to the result from Redis. Can
-be used instead of the callback function.
+    <p>A promise that resolves to the result from Redis. Can
+  be used instead of the callback function.</p>
 </div>
 
 
@@ -435,6 +513,11 @@ be used instead of the callback function.
   console.log(result); // Outputs the count for the current year
 });</code></pre>
 
+    <pre class="prettyprint"><code>myCounter.count('year', '/foo.html', function(err, result) {
+  // Outputs the count for the current year for the event object '/foo.html'
+  console.log(result);
+});</code></pre>
+
 
 
         
@@ -442,17 +525,16 @@ be used instead of the callback function.
 
     
 
-    <h4 class="name" id="countRange"><span class="type-signature"></span>countRange<span class="signature">(timeGranularity, startDate, endDate<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id="countRange"><span class="type-signature"></span>countRange<span class="signature">(timeGranularity, startDate, endDate<span class="signature-attributes">opt</span>, eventObj<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
 
 
 <div class="description">
-    Returns a object mapping timestamps to counts in the given time range at a
-specific time granularity level.
-
-Notice: This function does not make sense for the "none" time granularity.
+    <p>Returns an object mapping timestamps to counts in the given time range at a
+specific time granularity level.</p>
+<p>Notice: This function does not make sense for the &quot;none&quot; time granularity.</p>
 </div>
 
 
@@ -520,8 +602,8 @@ Notice: This function does not make sense for the "none" time granularity.
                 </td>
             
 
-            <td class="description last">The
-  granularity level to report the count for.</td>
+            <td class="description last"><p>The
+  granularity level to report the count for.</p></td>
         </tr>
 
     
@@ -565,9 +647,9 @@ Notice: This function does not make sense for the "none" time granularity.
                 </td>
             
 
-            <td class="description last">Start date for the range
+            <td class="description last"><p>Start date for the range
   (inclusive). Accepts the same argument as the constructor of a
-  <a href="http://momentjs.com/">moment</a> date.</td>
+  <a href="http://momentjs.com/">moment</a> date.</p></td>
         </tr>
 
     
@@ -615,9 +697,50 @@ Notice: This function does not make sense for the "none" time granularity.
                 </td>
             
 
-            <td class="description last">End date for the
+            <td class="description last"><p>End date for the
   range (inclusive). Accepts the same arguments as the constructor of a
-  <a href="http://momentjs.com/">moment</a> date.</td>
+  <a href="http://momentjs.com/">moment</a> date.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>eventObj</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+|
+
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"><p>The event object. See
+  <a href="TimestampedCounter.html#incr"><code>TimestampedCounter#incr</code></a> for more info on event objects.</p></td>
         </tr>
 
     
@@ -654,7 +777,7 @@ Notice: This function does not make sense for the "none" time granularity.
                 </td>
             
 
-            <td class="description last">Optional callback.</td>
+            <td class="description last"><p>Optional callback.</p></td>
         </tr>
 
     
@@ -670,6 +793,9 @@ Notice: This function does not make sense for the "none" time granularity.
 
     
 
+    
+    <dt class="tag-since">Since:</dt>
+    <dd class="tag-since"><ul class="dummy"><li>0.1.0</li></ul></dd>
     
 
     
@@ -695,7 +821,7 @@ Notice: This function does not make sense for the "none" time granularity.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line164">line 164</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line339">line 339</a>
     </li></ul></dd>
     
 
@@ -722,8 +848,8 @@ Notice: This function does not make sense for the "none" time granularity.
 
         
 <div class="param-desc">
-    A promise that resolves to the result from Redis. Can
-  be used instead of the callback function.
+    <p>A promise that resolves to the result from Redis. Can
+  be used instead of the callback function.</p>
 </div>
 
 
@@ -756,8 +882,8 @@ Notice: This function does not make sense for the "none" time granularity.
 
 
 <div class="description">
-    Return a list of Redis keys that are associated with this counter at the
-current point in time and will be written to Redis.
+    <p>Return a list of Redis keys that are associated with this counter at the
+current point in time and will be written to Redis.</p>
 </div>
 
 
@@ -801,7 +927,7 @@ current point in time and will be written to Redis.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line69">line 69</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line114">line 114</a>
     </li></ul></dd>
     
 
@@ -850,14 +976,14 @@ current point in time and will be written to Redis.
 
     
 
-    <h4 class="name" id="incr"><span class="type-signature"></span>incr<span class="signature">(callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id="getKeyTTL"><span class="type-signature"></span>getKeyTTL<span class="signature">(key)</span><span class="type-signature"> &rarr; {number}</span></h4>
 
     
 
 
 
 <div class="description">
-    Increments this counter with 1.
+    <p>Finds the configured time to live for the given key.</p>
 </div>
 
 
@@ -881,8 +1007,6 @@ current point in time and will be written to Redis.
         <th>Type</th>
 
         
-        <th>Attributes</th>
-        
 
         
 
@@ -895,33 +1019,24 @@ current point in time and will be written to Redis.
 
         <tr>
             
-                <td class="name"><code>callback</code></td>
+                <td class="name"><code>key</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">function</span>
+<span class="param-type">string</span>
 
 
             
             </td>
 
             
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
 
             
 
-            <td class="description last">Optional callback.</td>
+            <td class="description last"><p>The full key (including timestamp) for the key to
+  determine the ttl for.</p></td>
         </tr>
 
     
@@ -962,7 +1077,7 @@ current point in time and will be written to Redis.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line92">line 92</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line137">line 137</a>
     </li></ul></dd>
     
 
@@ -989,8 +1104,461 @@ current point in time and will be written to Redis.
 
         
 <div class="param-desc">
-    A promise that resolves to the results from Redis. Can
-be used instead of the callback function.
+    <p>Number of seconds that the key should live.</p>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">number</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="incr"><span class="type-signature"></span>incr<span class="signature">(eventObj<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+
+    
+
+
+
+<div class="description">
+    <p>Increments this counter with 1.</p>
+<p>For some use cases, it makes sense to pass in an event object to get more
+precise statistics for a specific event. For example, when counting page
+views on a page, it makes sense to increment a counter per specific page.
+For this use case, the eventObj parameter is a good fit.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>eventObj</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+|
+
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"><p>Extra event information used to
+  determine what counter to increment.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>callback</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"><p>Optional callback.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+    <dt class="tag-since">Since:</dt>
+    <dd class="tag-since"><ul class="dummy"><li>0.1.0</li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line182">line 182</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>A promise that resolves to the results from Redis. Can
+  be used instead of the callback function.</p>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="incrby"><span class="type-signature"></span>incrby<span class="signature">(amount, eventObj<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+
+    
+
+
+
+<div class="description">
+    <p>Increments this counter with the given amount.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>amount</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"><p>The amount to increment with.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>eventObj</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+|
+
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"><p>Extra event information used to
+  determine what counter to increment. See <a href="TimestampedCounter.html#incr"><code>TimestampedCounter#incr</code></a>.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>callback</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"><p>Optional callback.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+    <dt class="tag-since">Since:</dt>
+    <dd class="tag-since"><ul class="dummy"><li>0.2.0</li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line198">line 198</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+    <dt class="tag-see">See:</dt>
+    <dd class="tag-see">
+        <ul>
+            <li><a href="TimestampedCounter.html#incr"><code>TimestampedCounter#incr</code></a></li>
+        </ul>
+    </dd>
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>A promise that resolves to the results from Redis. Can
+  be used instead of the callback function.</p>
 </div>
 
 
@@ -1027,13 +1595,13 @@ be used instead of the callback function.
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-constants.html">constants</a></li><li><a href="module-utils.html">utils</a></li></ul><h3>Classes</h3><ul><li><a href="RedisMetrics.html">RedisMetrics</a></li><li><a href="TimestampedCounter.html">TimestampedCounter</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-constants.html">constants</a></li></ul><h3>Classes</h3><ul><li><a href="RedisMetrics.html">RedisMetrics</a></li><li><a href="TimestampedCounter.html">TimestampedCounter</a></li></ul><h3>Tutorials</h3><ul><li><a href="tutorial-counting.html">Counting stuff</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-beta3</a> on Mon Apr 13 2015 16:42:48 GMT+0200 (CEST)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-beta3</a> on Thu Apr 16 2015 15:20:24 GMT+0200 (CEST)
 </footer>
 
 <script> prettyPrint(); </script>
