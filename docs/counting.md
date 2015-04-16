@@ -107,7 +107,7 @@ TimestampedCounter#countRange|countRange} function:
 ```javascript
 // Moment is nice and easy for dates so we'll just use that here.
 var moment = require('moment');
-var yesterday = moment().add(-24, 'hours');
+var yesterday = moment().subtract(24, 'hours');
 
 // No end time specified so use the current time will be used.
 myCounter.countRange('hour', yesterday, function(err, result) {
@@ -157,7 +157,7 @@ myCounter.incr('/contact', function(err, result) {
   console.log(result);
 });
 
-// Increment the page view counter for the event object "/contact".
+// Increment the page view counter for the event object "/about".
 myCounter.incr('/about', function(err, result) {
   console.log(result);
 });
@@ -188,7 +188,7 @@ here is the answer:
 ```javascript
 // Moment is nice and easy for dates so we'll just use that here.
 var moment = require('moment');
-var yesterday = moment().add(-24, 'hours');
+var yesterday = moment().subtract(24, 'hours');
 var now = moment();
 
 myCounter.countRange('hour', yesterday, now, '/about', function(err, result) {
