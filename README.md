@@ -69,7 +69,7 @@ myCounter.count('year')
 // We are using moment here for convenience.
 var moment = require('moment');
 var now = moment();
-var lastHour = moment(now).add(-1, 'hours');
+var lastHour = moment(now).subtract(1, 'hours');
 myCounter.countRange('hour', lastHour, now)
   .then(function(obj) {
     // "obj" is an object with timestamps as keys and counts as values.
@@ -81,7 +81,7 @@ myCounter.countRange('hour', lastHour, now)
   });
 
 // Fetch the count for each day in the last 30 days
-var thirtyDaysAgo = moment(now).add(-30, 'days');
+var thirtyDaysAgo = moment(now).subtract(30, 'days');
 myCounter.countRange('day', thirtyDaysAgo, now)
   .then(function(obj) {
     // "obj" contains counter information for each of the last thirty days.
