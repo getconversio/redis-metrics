@@ -2,7 +2,14 @@
   "source": {
     "include": [ "lib/" ]
   },
+  "templates": {
+    "cleverLinks": true
+  },
+  "plugins": [
+    "plugins/markdown"
+  ],
   "opts": {
+    "tutorials": "docs/",
     "destination": "out/",
     "recurse": true,
     "readme": "README.md"

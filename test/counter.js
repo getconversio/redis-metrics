@@ -29,9 +29,10 @@ describe('Counter', function() {
 
     it('should set some defaults', function() {
       var counter = new TimestampedCounter(metrics, 'foo');
-      expect(counter.key).to.equal('c:foo');
       expect(counter.metrics).to.equal(metrics);
+      expect(counter.key).to.equal('c:foo');
       expect(counter.options.timeGranularity).to.equal(0);
+      expect(counter.options.expireKeys).to.be.true;
     });
 
     it('should reset an incorrect time granularity to "none"', function() {
@@ -135,14 +136,133 @@ describe('Counter', function() {
     });
   });
 
+  describe('getKeyTTL', function() {
+    it('should the default for seconds', function() {
+      var counter = new TimestampedCounter(metrics, 'foo');
+      var key = 'c:foo:20150102030405';
+      var ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(10 * 60);
+    });
+
+    it('should the default for minutes', function() {
+      var counter = new TimestampedCounter(metrics, 'foo');
+      var key = 'c:foo:201501020304';
+      var ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(12 * 60 * 60);
+    });
+
+    it('should the default for hours', function() {
+      var counter = new TimestampedCounter(metrics, 'foo');
+      var key = 'c:foo:2015010203';
+      var ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(31 * 24 * 60 * 60);
+    });
+
+    it('should the default for days', function() {
+      var counter = new TimestampedCounter(metrics, 'foo');
+      var key = 'c:foo:20150102';
+      var ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(2 * 365 * 24 * 60 * 60);
+    });
+
+    it('should the default for months', function() {
+      var counter = new TimestampedCounter(metrics, 'foo');
+      var key = 'c:foo:201501';
+      var ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(10 * 365 * 24 * 60 * 60);
+    });
+
+    it('should the default for years', function() {
+      var counter = new TimestampedCounter(metrics, 'foo');
+      var key = 'c:foo:2015';
+      var ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(-1);
+    });
+
+    it('should the default for none', function() {
+      var counter = new TimestampedCounter(metrics, 'foo');
+      var key = 'c:foo';
+      var ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(-1);
+    });
+
+    it('should allow the expiration to be configured', function() {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expiration: {
+          total: 1
+        }
+      });
+      var key = 'c:foo';
+      var ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(1);
+
+      counter = new TimestampedCounter(metrics, 'foo', {
+        expiration: {
+          0: 2
+        }
+      });
+
+      ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(2);
+
+      counter = new TimestampedCounter(metrics, 'foo', {
+        expiration: {
+          'total': 3
+        }
+      });
+
+      ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(3);
+
+      counter = new TimestampedCounter(metrics, 'foo', {
+        expiration: {
+          T: 4
+        }
+      });
+
+      ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(4);
+    });
+
+    it('should return the default value if configuration is missing', function() {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expiration: {
+          total: 10
+        }
+      });
+      // Only total is set, yearly is not, use default of -1
+      var key = 'c:foo:2015';
+      var ttl = counter.getKeyTTL(key);
+      expect(ttl).to.equal(-1);
+    });
+  });
+
   describe('incr', function() {
-    it('should call redis incrby without a transaction when no time granularity is chosen', function(done) {
+    it('should call redis incrby without a transaction when keys do not expire', function(done) {
       var multiSpy = sandbox.spy(metrics.client, 'multi');
       var incrSpy = sandbox.spy(metrics.client, 'incrby');
 
-      var counter = new TimestampedCounter(metrics, 'foo');
+      var counter = new TimestampedCounter(metrics, 'foo', { expireKeys: false });
       counter.incr().then(function() {
         sinon.assert.calledOnce(incrSpy);
+        sinon.assert.notCalled(multiSpy);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should call redis eval without a transaction when counters expire', function(done) {
+      var multiSpy = sandbox.spy(metrics.client, 'multi');
+      var evalSpy = sandbox.spy(metrics.client, 'eval');
+
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 10
+        }
+      });
+      counter.incr().then(function() {
+        sinon.assert.calledOnce(evalSpy);
         sinon.assert.notCalled(multiSpy);
         done();
       })
@@ -185,7 +305,7 @@ describe('Counter', function() {
       var mock = sandbox.stub(metrics.client, 'incrby')
         .yields(new Error('oh no'), null);
 
-      var counter = new TimestampedCounter(metrics, 'foo');
+      var counter = new TimestampedCounter(metrics, 'foo', { expireKeys: false });
       counter.incr(function(err, result) {
         expect(err).to.not.be.null;
         expect(result).to.be.null;
@@ -197,7 +317,7 @@ describe('Counter', function() {
       var mock = sandbox.stub(metrics.client, 'incrby')
         .yields(new Error('oh no'), null);
 
-      var counter = new TimestampedCounter(metrics, 'foo');
+      var counter = new TimestampedCounter(metrics, 'foo', { expireKeys: false });
       counter.incr().then(function() {
         done(new Error('Should not be here'));
       })
@@ -207,7 +327,7 @@ describe('Counter', function() {
       });
     });
 
-    it('should return a list of results from the operation', function(done) {
+    it('should return a list of results', function(done) {
       var counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
@@ -220,8 +340,30 @@ describe('Counter', function() {
       .catch(done);
     });
 
-    it('should work with an event object', function(done) {
-      var counter = new TimestampedCounter(metrics, 'foo');
+    it('should return a list of results for non-expiring keys', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year',
+        expireKeys: false
+      });
+
+      counter.incr().then(function(results) {
+        expect(results).to.be.instanceof(Array);
+        expect(results).to.deep.equal([1, 1]);
+        done();
+      })
+      .catch(done);
+    });
+  });
+
+  describe('incr with event object', function() {
+
+    it('should work with an event object when a counter expires', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 10
+        }
+      });
 
       counter.incr('bar').then(function(result) {
         expect(parseInt(result)).to.equal(1);
@@ -230,9 +372,36 @@ describe('Counter', function() {
       .catch(done);
     });
 
-    it('should work with an event object and time granularity', function(done) {
+    it('should work with an event object and non-expiring keys', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', { expireKeys: false });
+
+      counter.incr('bar').then(function(result) {
+        expect(parseInt(result)).to.equal(1);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should work with an event object, time granularity and a counter that expires', function(done) {
       var counter = new TimestampedCounter(metrics, 'foo', {
-        timeGranularity: 'year'
+        timeGranularity: 'year',
+        expireKeys: true,
+        expiration: {
+          year: 10
+        }
+      });
+
+      counter.incr('bar').then(function(results) {
+        expect(utils.parseIntArray(results)).to.deep.equal([1, 1]);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should work with an event object, time granularity and non-expiring keys', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year',
+        expireKeys: false
       });
 
       counter.incr('bar').then(function(results) {
@@ -245,13 +414,31 @@ describe('Counter', function() {
   });
 
   describe('incrby', function() {
-    it('should call redis incrby without a transaction when no time granularity is chosen', function(done) {
+    it('should call redis incrby without a transaction when keys do not expire', function(done) {
       var multiSpy = sandbox.spy(metrics.client, 'multi');
       var incrSpy = sandbox.spy(metrics.client, 'incrby');
 
-      var counter = new TimestampedCounter(metrics, 'foo');
+      var counter = new TimestampedCounter(metrics, 'foo', { expireKeys: false });
       counter.incrby(2).then(function() {
         sinon.assert.calledOnce(incrSpy);
+        sinon.assert.notCalled(multiSpy);
+        done();
+      })
+      .catch(done);
+    });
+
+    it('should call redis eval without a transaction when counters expire', function(done) {
+      var multiSpy = sandbox.spy(metrics.client, 'multi');
+      var evalSpy = sandbox.spy(metrics.client, 'eval');
+
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 10
+        }
+      });
+      counter.incrby(2).then(function() {
+        sinon.assert.calledOnce(evalSpy);
         sinon.assert.notCalled(multiSpy);
         done();
       })
@@ -290,11 +477,11 @@ describe('Counter', function() {
       .catch(done);
     });
 
-    it('should call the callback on error', function(done) {
+    it('should call the callback on error from incrby', function(done) {
       var mock = sandbox.stub(metrics.client, 'incrby')
         .yields(new Error('oh no'), null);
 
-      var counter = new TimestampedCounter(metrics, 'foo');
+      var counter = new TimestampedCounter(metrics, 'foo', { expireKeys: false });
       counter.incrby(6, function(err, result) {
         expect(err).to.not.be.null;
         expect(result).to.be.null;
@@ -302,11 +489,47 @@ describe('Counter', function() {
       });
     });
 
-    it('should reject the promise on error', function(done) {
+    it('should call the callback on error from eval', function(done) {
+      var mock = sandbox.stub(metrics.client, 'eval')
+        .yields(new Error('oh no'), null);
+
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 10
+        }
+      });
+      counter.incrby(6, function(err, result) {
+        expect(err).to.not.be.null;
+        expect(result).to.be.null;
+        done();
+      });
+    });
+
+    it('should reject the promise on redis error from incrby', function(done) {
       var mock = sandbox.stub(metrics.client, 'incrby')
         .yields(new Error('oh no'), null);
 
-      var counter = new TimestampedCounter(metrics, 'foo');
+      var counter = new TimestampedCounter(metrics, 'foo', { expireKeys: false });
+      counter.incrby(7).then(function() {
+        done(new Error('Should not be here'));
+      })
+      .catch(function(err) {
+        expect(err).to.not.be.null;
+        done();
+      });
+    });
+
+    it('should reject the promise on redis error with eval', function(done) {
+      var mock = sandbox.stub(metrics.client, 'eval')
+        .yields(new Error('oh no'), null);
+
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 10
+        }
+      });
       counter.incrby(7).then(function() {
         done(new Error('Should not be here'));
       })
@@ -328,6 +551,9 @@ describe('Counter', function() {
       })
       .catch(done);
     });
+  });
+
+  describe('incrby with event object', function() {
 
     it('should work with an event object', function(done) {
       var counter = new TimestampedCounter(metrics, 'foo');
@@ -817,6 +1043,144 @@ describe('Counter', function() {
           });
         })
         .catch(done);
+    });
+  });
+
+  describe('incr with expiration', function() {
+    it('should set a ttl for a key', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 100
+        }
+      });
+
+      counter.incr().then(function() {
+        var key = counter.getKeys()[0];
+        metrics.client.ttl(key, function(err, ttl) {
+          expect(err).to.be.null;
+          expect(ttl).to.be.above(0);
+          expect(ttl).to.be.most(100);
+          done();
+        });
+      })
+      .catch(done);
+    });
+
+    it('should set a ttl for a key with event objects', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 100
+        }
+      });
+
+      counter.incr('bar').then(function() {
+        var key = counter.getKeys()[0] + ':z';
+        metrics.client.ttl(key, function(err, ttl) {
+          expect(err).to.be.null;
+          expect(ttl).to.be.above(0);
+          expect(ttl).to.be.most(100);
+          done();
+        });
+      })
+      .catch(done);
+    });
+
+    it('should not renew the ttl on the second call', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 100
+        }
+      });
+
+      counter.incr().then(function() {
+        var key = counter.getKeys()[0];
+        metrics.client.ttl(key, function(err, ttl) {
+          setTimeout(function() {
+            counter.incr().then(function() {
+              metrics.client.ttl(key, function(err2, ttl2) {
+                // Expect that ttl has decreased.
+                console.log(ttl, ttl2);
+                expect(ttl2).to.be.below(ttl);
+                expect(ttl2).to.be.within(ttl-2, ttl);
+                done();
+              });
+            });
+          }, 1100);
+        });
+      })
+      .catch(done);
+    });
+
+    it('should not renew the ttl on the second call with event object', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 100
+        }
+      });
+
+      counter.incr('bar').then(function() {
+        var key = counter.getKeys()[0] + ':z';
+        metrics.client.ttl(key, function(err, ttl) {
+          setTimeout(function() {
+            counter.incr('bar').then(function() {
+              metrics.client.ttl(key, function(err2, ttl2) {
+                // Expect that ttl has decreased.
+                console.log(ttl, ttl2);
+                expect(ttl2).to.be.below(ttl);
+                expect(ttl2).to.be.within(ttl-2, ttl);
+                done();
+              });
+            });
+          }, 1100);
+        });
+      })
+      .catch(done);
+    });
+  });
+
+  describe('incrby with expiration', function() {
+    it('should set a ttl for a key', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 60 // Gone in 60 seconds :-)
+        }
+      });
+
+      counter.incrby(10).then(function() {
+        var key = counter.getKeys()[0];
+        metrics.client.ttl(key, function(err, ttl) {
+          expect(err).to.be.null;
+          expect(ttl).to.be.above(0);
+          expect(ttl).to.be.most(60);
+          done();
+        });
+      })
+      .catch(done);
+    });
+
+    it('should set a ttl for a key with event objects', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 100
+        }
+      });
+
+      counter.incrby(10, 'bar').then(function() {
+        var key = counter.getKeys()[0] + ':z';
+        metrics.client.ttl(key, function(err, ttl) {
+          expect(err).to.be.null;
+          expect(ttl).to.be.above(0);
+          expect(ttl).to.be.most(100);
+          done();
+        });
+      })
+      .catch(done);
     });
   });
 });
