@@ -214,9 +214,9 @@ event objects, the end date is mandatory.
 #### Top N for event objects
 
 Because event objects are stored in [sorted
-sets](http://redis.io/topics/data-types), we automatically get some benefits
-from Redis. For example, it is very easy to get a list of the top 10 visited
-pages for our counter or even a sorted list of all pages by page count.
+sets](http://redis.io/topics/data-types#sorted-sets), we automatically get some
+benefits from Redis. For example, it is very easy to get a list of the top 10
+visited pages for our counter or even a sorted list of all pages by page count.
 
 Since we are at a very early stage in the project, this feature has not been
 added yet, but it will in the near future because it fits our own use cases
