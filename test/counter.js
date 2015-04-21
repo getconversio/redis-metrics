@@ -1183,4 +1183,22 @@ describe('Counter', function() {
       .catch(done);
     });
   });
+
+  describe('top', function() {
+    it('should work with callback', function(done) {
+      var mock = sandbox.mock(metrics.client)
+        .expects('zrevrange')
+        .once()
+        .yields(null, [ 'foo', '39', 'bar', '13' ]);
+
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.top('foo', function(err, results) {
+        mock.verify();
+        expect(results).to.have.length(2);
+        expect(results[0]).to.have.property('foo');
+        expect(results[0].foo).to.equal(39);
+        done(err);
+      });
+    });
+  });
 });
