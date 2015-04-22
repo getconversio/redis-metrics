@@ -1228,7 +1228,7 @@ describe('Counter', function() {
         .yields(null, [ 'foo', '39', 'bar', '13' ]);
 
       var counter = new TimestampedCounter(metrics, 'foo');
-      counter.top('foo', 10, function(err, results) {
+      counter.top('foo', 'desc', 10, function(err, results) {
         mock.verify();
         done(err);
       });
@@ -1242,10 +1242,36 @@ describe('Counter', function() {
         .yields(null, [ 'foo', '39', 'bar', '13' ]);
 
       var counter = new TimestampedCounter(metrics, 'foo');
-      counter.top('foo', 10, 15, function(err, results) {
+      counter.top('foo', 'desc', 10, 15, function(err, results) {
         mock.verify();
         done(err);
       });
     });
+
+    it('should accept a direction argument with asc value', function(done) {
+      var mock = sandbox.mock(metrics.client)
+        .expects('zrange')
+        .once()
+        .withArgs('c:foo:z', 0, -1, 'WITHSCORES')
+        .yields(null, [ 'foo', '39', 'bar', '13' ]);
+
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.top('foo', 'asc', function(err, results) {
+        mock.verify();
+        done(err);
+      });
+    });
+
+    it('should throw an exception if the direction argument is not correct',
+      function(done) {
+        var counter = new TimestampedCounter(metrics, 'foo');
+        try {
+          counter.top('foo', 'dummy');
+        } catch (e) {
+          return done();
+        }
+
+        throw new Error('This should never be called.');
+      });
   });
 });
