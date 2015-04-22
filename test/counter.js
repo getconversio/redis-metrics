@@ -1189,6 +1189,7 @@ describe('Counter', function() {
       var mock = sandbox.mock(metrics.client)
         .expects('zrevrange')
         .once()
+        .withArgs('c:foo:z', 0, -1, 'WITHSCORES')
         .yields(null, [ 'foo', '39', 'bar', '13' ]);
 
       var counter = new TimestampedCounter(metrics, 'foo');
@@ -1197,6 +1198,52 @@ describe('Counter', function() {
         expect(results).to.have.length(2);
         expect(results[0]).to.have.property('foo');
         expect(results[0].foo).to.equal(39);
+        done(err);
+      });
+    });
+
+    it('should work with promises', function(done) {
+      var mock = sandbox.mock(metrics.client)
+        .expects('zrevrange')
+        .once()
+        .yields(null, [ 'foo', '39', 'bar', '13' ]);
+
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.top('foo')
+        .then(function(results) {
+          mock.verify();
+          expect(results).to.have.length(2);
+          expect(results[0]).to.have.property('foo');
+          expect(results[0].foo).to.equal(39);
+          done();
+        })
+        .catch(done);
+    });
+
+    it('should accept a startingAt argument', function(done) {
+      var mock = sandbox.mock(metrics.client)
+        .expects('zrevrange')
+        .once()
+        .withArgs('c:foo:z', 10, -1, 'WITHSCORES')
+        .yields(null, [ 'foo', '39', 'bar', '13' ]);
+
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.top('foo', 10, function(err, results) {
+        mock.verify();
+        done(err);
+      });
+    });
+
+    it('should accept a startingAt and a limit argument', function(done) {
+      var mock = sandbox.mock(metrics.client)
+        .expects('zrevrange')
+        .once()
+        .withArgs('c:foo:z', 10, 15, 'WITHSCORES')
+        .yields(null, [ 'foo', '39', 'bar', '13' ]);
+
+      var counter = new TimestampedCounter(metrics, 'foo');
+      counter.top('foo', 10, 15, function(err, results) {
+        mock.verify();
         done(err);
       });
     });
