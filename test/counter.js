@@ -1044,6 +1044,52 @@ describe('Counter', function() {
         })
         .catch(done);
     });
+
+    it('should return a single number if total granularity is selected', function(done) {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      // Increment 2014 once and 2015 twice => total is 3
+
+      var start = moment.utc({ year: 2014 });
+      var end = moment.utc({ year: 2015 });
+
+      var clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
+      counter.incr()
+        .then(function() {
+          clock.tick(1000*60*60*24*365);
+          return counter.incr();
+        })
+        .then(function() {
+          return counter.incr();
+        })
+        .then(function() {
+          return counter.countRange('total', start, end);
+        })
+        .then(function(result) {
+          // Check promise
+          expect(result).to.equal(3);
+
+          // Check callback
+          counter.countRange('total', start, end, function(err, res) {
+            expect(res).to.equal(3);
+            done();
+          });
+        })
+        .catch(done);
+    });
+
+    it('should throw an exception if countRange is used on a counter with total granularity', function() {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'total'
+      });
+
+      var throwClosure = function() {
+        counter.countRange('total', '2015', '2016');
+      };
+      expect(throwClosure).to.throw(Error);
+    });
   });
 
   describe('incr with expiration', function() {
