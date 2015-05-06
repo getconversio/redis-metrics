@@ -57,6 +57,29 @@ describe('Metric main', function() {
       RedisMetrics({ redisOptions: redisOpts });
       mock.verify();
     });
+
+    it('should recycle the client if passed as an option', function() {
+      var client = redis.createClient();
+
+      var mock = sandbox.mock(redis)
+        .expects('createClient')
+        .never();
+
+      RedisMetrics({ client: client });
+      mock.verify();
+    });
+
+    it('should throw an error if the client option is not a redis object', function() {
+      var client = { };
+
+      try {
+        RedisMetrics({ client: client });
+      } catch (e) {
+        return;
+      }
+
+      throw new Error('This should never be called.');
+    });
   });
 
   describe('counter', function() {
