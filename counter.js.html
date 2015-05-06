@@ -94,6 +94,17 @@ var createRangeParser = function(keyRange) {
 };
 
 /**
+ * Creates a function that parses a list of Redis results and returns the total.
+ * @returns {function}
+ * @private
+ */
+var createRangeTotalParser = function() {
+  return function(results) {
+    return _.sum(utils.parseIntArray(results));
+  };
+};
+
+/**
  * A timestamped event counter.
  *
  * The timestamped counter stores one or more Redis keys based on the given
@@ -379,6 +390,22 @@ TimestampedCounter.prototype.countRange = function(
   }
   if (eventObj) eventObj = String(eventObj);
 
+  // Save the report time granularity because it might change.
+  var reportTimeGranularity = timeGranularity;
+
+  // If the range granularity is total, fall back to the granularity specified
+  // at the counter level and then add the numbers together when parsing the
+  // result.
+  if (timeGranularity === timeGranularities.total) {
+    timeGranularity = this.options.timeGranularity;
+
+    // If the rangeGranularity is still total, it does not make sense to report
+    // a range for the counter and we throw an error.
+    if (timeGranularity === timeGranularities.total) {
+      throw new Error('total granularity not supported for this counter');
+    }
+  }
+
   var momentRange = utils.momentRange(startDate, endDate, timeGranularity);
   var _this = this;
   var keyRange = [];
@@ -396,8 +423,9 @@ TimestampedCounter.prototype.countRange = function(
   });
 
   var deferred = Q.defer();
-  var rangeParser = createRangeParser(momentKeyRange);
-  var cb = utils.createRedisCallback(deferred, callback, rangeParser);
+  var parser = reportTimeGranularity === timeGranularities.total ?
+    createRangeTotalParser() : createRangeParser(momentKeyRange);
+  var cb = utils.createRedisCallback(deferred, callback, parser);
 
   this._countRange(keyRange, eventObj, cb);
 
@@ -416,6 +444,104 @@ TimestampedCounter.prototype._countRange = function(keys, eventObj, cb) {
   }
 };
 
+/**
+ * Parse a rank result from redis
+ * @param  {array} rank In this format: [ 'foo', '39', 'bar', '13' ]
+ * @return {object} In this format: [ { foo: 39 }, { bar: 13 } ]
+ */
+var rankParser = function(rank) {
+  // groups the array for each second row
+  rank = _.groupBy(rank, function(row, index) {
+    return Math.floor(index / 2);
+  });
+
+  // transform the object into an array
+  // and the values to integer
+  return _.toArray(rank)
+    .map(function(row) {
+      var _row = {};
+      _row[row[0]] = parseInt(row[1], 10);
+
+      return _row;
+    });
+};
+
+
+/**
+ * Returns the current top elements for this counter.
+ *
+ * If a specific time granularity is given, the value returned is the current
+ * value at the given granularity level. Effectively, this provides a single
+ * answer to questions such as "what is the rank for the current day".
+ *
+ * @example
+ * myCounter.top(function(err, result) {
+ *   console.log(result); // Outputs the global rank
+ * });
+ * @example
+ * myCounter.top('year', function(err, result) {
+ *   console.log(result); // Outputs the rank for the current year
+ * });
+ *
+ * @param {module:constants~timeGranularities} [timeGranularity='total'] - The
+ *   granularity level to report the rank for.
+ * @param {string} [direction] - Optional sort direction, can be "asc" or "desc"
+ * @param {integer} [startingAt] - Optional starting row, default 0
+ * @param {integer} [limit] - Optional number of results to return, default -1
+ * @param {function} [callback] - Optional callback.
+ * @returns {Promise} A promise that resolves to the result from Redis. Can
+ *   be used instead of the callback function.
+ * @since 0.1.1
+ */
+TimestampedCounter.prototype.top = function(
+  timeGranularity, direction, startingAt, limit, callback) {
+  var args = Array.prototype.slice.call(arguments);
+
+  // Last argument is callback;
+  callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+
+  limit = args.length > 3 ? args.pop() : -1;
+  startingAt = args.length > 2 ? args.pop() : 0;
+  direction = args.length > 1 ? args.pop() : 'desc';
+
+  if (['asc', 'desc'].indexOf(direction) === -1) {
+    throw new Error(
+      'The direction parameter is expected to be one between ' +
+      '"asc" or "desc", got "' + direction + '".'
+    );
+  }
+
+  timeGranularity = parseTimeGranularity(timeGranularity);
+
+  var deferred = Q.defer();
+  var cb = utils.createRedisCallback(deferred, callback, rankParser);
+  this._top(timeGranularity, direction, startingAt, limit, cb);
+  return deferred.promise;
+};
+
+TimestampedCounter.prototype._top = function(
+  timeGranularity, direction, startingAt, limit, cb) {
+  var theKey = this.getKeys()[timeGranularity];
+
+  if (direction === 'asc') {
+    return this.metrics.client.zrange(
+      theKey + ':z',
+      startingAt,
+      limit,
+      'WITHSCORES',
+      cb
+    );
+  }
+
+  this.metrics.client.zrevrange(
+    theKey + ':z',
+    startingAt,
+    limit,
+    'WITHSCORES',
+    cb
+  );
+};
+
 module.exports = TimestampedCounter;
 </code></pre>
         </article>
@@ -427,13 +553,13 @@ module.exports = TimestampedCounter;
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-constants.html">constants</a></li></ul><h3>Classes</h3><ul><li><a href="RedisMetrics.html">RedisMetrics</a></li><li><a href="TimestampedCounter.html">TimestampedCounter</a></li></ul><h3>Tutorials</h3><ul><li><a href="tutorial-counting.html">Counting stuff</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-constants.html">constants</a></li></ul><h3>Classes</h3><ul><li><a href="RedisMetrics.html">RedisMetrics</a></li><li><a href="TimestampedCounter.html">TimestampedCounter</a></li></ul><h3>Tutorials</h3><ul><li><a href="tutorial-counting.html">Counting stuff</a></li></ul><h3>Global</h3><ul><li><a href="global.html#rankParser">rankParser</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-beta3</a> on Thu Apr 16 2015 16:34:18 GMT+0200 (CEST)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-beta3</a> on Wed May 06 2015 15:28:06 GMT+0200 (CEST)
 </footer>
 
 <script> prettyPrint(); </script>
