@@ -99,6 +99,14 @@ myCounter.countRange('day', thirtyDaysAgo, now)
 // the hour.
 ```
 
+Redis Namespace
+----
+By default keys are stored in Redis as `c:{name}:{period}`. If you prefer to use a different Redis namespace than `c`, you can pass this in as an option:
+```
+var myCounter = metrics.counter('pageview', { timeGranularity: 'hour', namespace: 'stats' });`
+```
+
+
 Test
 ----
 Run tests including code coverage:

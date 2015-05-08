@@ -33,6 +33,15 @@ describe('Counter', function() {
       expect(counter.key).to.equal('c:foo');
       expect(counter.options.timeGranularity).to.equal(0);
       expect(counter.options.expireKeys).to.be.true;
+      expect(counter.options.namespace).to.equal('c');
+    });
+
+    it('should respect the passed namespace in the key', function () {
+      var counter = new TimestampedCounter(metrics, 'foo', {
+        namespace: 'stats'
+      });
+      expect(counter.key).to.equal('stats:foo');
+      expect(counter.options.namespace).to.equal('stats');
     });
 
     it('should reset an incorrect time granularity to "none"', function() {
