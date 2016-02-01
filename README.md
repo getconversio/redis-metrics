@@ -1,8 +1,6 @@
 redis-metrics
 =============
 
-[![Code Climate](https://codeclimate.com/github/Receiptful/redis-metrics/badges/gpa.svg)](https://codeclimate.com/github/Receiptful/redis-metrics) [![Test Coverage](https://codeclimate.com/github/Receiptful/redis-metrics/badges/coverage.svg)](https://codeclimate.com/github/Receiptful/redis-metrics)
-
 Easy metric tracking and aggregation using Redis.
 
 This module was originally created to provide an easy way of storing and
