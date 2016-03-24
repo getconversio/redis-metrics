@@ -13,6 +13,8 @@
   // Define globals exposed by Node.js.
   "node": true,
 
+  "esnext": true,
+
   /*
    * ENFORCING OPTIONS
    * =================
@@ -20,7 +22,7 @@
 
   // Force all variable names to use either camelCase style or UPPER_CASE
   // with underscores.
-  "camelcase": true,
+  "camelcase": false,
 
   // Prohibit use of == and != in favor of === and !==.
   "eqeqeq": true,
@@ -55,5 +57,17 @@
    */
 
   // Suppress warnings about == null comparisons.
-  "eqnull": true
+  "eqnull": true,
+
+  "mocha": true,
+
+  "globals": {
+    "jquery": false,
+    "$": false,
+    "Morris": false,
+    "alert": false,
+    "alertify": false,
+    "printStackTrace": false,
+    "Spinner": false
+  }
 }
