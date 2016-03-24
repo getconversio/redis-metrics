@@ -1,11 +1,12 @@
 'use strict';
 
 var redis = require('redis'),
-    sinon = require('sinon'),
-    chai = require('chai'),
-    expect = chai.expect,
-    RedisMetrics = require('../lib/metrics'),
-    TimestampedCounter = require('../lib/counter');
+  sinon = require('sinon'),
+  chai = require('chai'),
+  RedisMetrics = require('../lib/metrics'),
+  TimestampedCounter = require('../lib/counter');
+
+var expect = chai.expect;
 
 describe('Metric main', function() {
 
@@ -25,7 +26,7 @@ describe('Metric main', function() {
     });
 
     it('should create an instance without new keyword', function() {
-      var metrics = RedisMetrics();
+      var metrics = new RedisMetrics();
       expect(metrics).to.be.instanceof(RedisMetrics);
     });
 
@@ -34,27 +35,28 @@ describe('Metric main', function() {
         .expects('createClient')
         .once()
         .withExactArgs();
-      RedisMetrics();
+      new RedisMetrics();
       mock.verify();
     });
 
-    it('should create a redis client with hostname and port if provided', function() {
+    it('should create a redis client with host and port if passed', function() {
       var mock = sandbox.mock(redis)
         .expects('createClient')
         .once()
         .withExactArgs(1234, 'abcd', {});
-      RedisMetrics({ host: 'abcd', port: 1234 });
+      new RedisMetrics({ host: 'abcd', port: 1234 });
       mock.verify();
     });
 
     it('should create a redis client with options if provided', function() {
+      // jscs:disable requireCamelCaseOrUpperCaseIdentifiers
       var redisOpts = { no_ready_check: true };
 
       var mock = sandbox.mock(redis)
         .expects('createClient')
         .once()
         .withExactArgs(redisOpts);
-      RedisMetrics({ redisOptions: redisOpts });
+      new RedisMetrics({ redisOptions: redisOpts });
       mock.verify();
     });
 
@@ -65,15 +67,15 @@ describe('Metric main', function() {
         .expects('createClient')
         .never();
 
-      RedisMetrics({ client: client });
+      new RedisMetrics({ client: client });
       mock.verify();
     });
 
-    it('should throw an error if the client option is not a redis object', function() {
+    it('should throw an error if the client is not a redis object', function() {
       var client = { };
 
       try {
-        RedisMetrics({ client: client });
+        new RedisMetrics({ client: client });
       } catch (e) {
         return;
       }
@@ -101,7 +103,7 @@ describe('Metric main', function() {
       expect(counter.options.timeGranularity).to.equal(1);
     });
 
-    it('should use the default counter options when none are provided', function() {
+    it('should use the default options when none are provided', function() {
       metrics = new RedisMetrics({
         counterOptions: {
           timeGranularity: 2
