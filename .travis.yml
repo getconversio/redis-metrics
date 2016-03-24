@@ -12,6 +12,9 @@ deploy:
     secure: jINm2YE0ZKLivzGW40OhI91FRNWWGkHSjRqR9JtMPFiCJD6ol1SxNg+QjS2m8hkeCmSaJ8ZmT+wsIWThfYJixFh+nO4+ixhDF0hgyMgCUCHd5KCZUKkwgjBMmGiopVHqCOh24qjSQH4Tx2WiL0n8lFN8EOgrH54n2iwcro4oSPA=
   email:
     secure: ReldtI/qWiezDWylhENP+QWnyTlVOQgfdUoCmfZ+3yt70hdRMZeFF2Lwhp31Lzlf+8KmSlw1TGPTyTHqv1SE/artFuGr1+GuDp6bC17aBsSx9G5bc/QpQtL+xW4f+3/kS+Zubxa4D6ajxMa+lfR0qPAhBdso5vjXyypCmp4CaOU=
+  on:
+    tags: true
+    repo: Receiptful/redis-metrics
 notifications:
   slack:
     secure: PiOgA/Hj5VRI91GASfOV31O2Ig+3kvN5AiyX8OKLADXgq/n/g1Aixavv5PgRwN5MuqAk4T/mh5ZYcTyJr18Ke1M1o5bvwJ8171BhfFPiBpPrzK4VA24KE4LA729HIBLq/fzksx0YQTkfIE5xmt8u3CG0usrn7P94gYJAcAsVvgQ=
