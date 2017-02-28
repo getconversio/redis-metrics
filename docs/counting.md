@@ -20,7 +20,8 @@ Let's start by creating a counter that is capable of reporting counts with a
 time granularity of one hour:
 
 ```javascript
-var metrics = require('redis-metrics')();
+var RedisMetrics = require('redis-metrics');
+var metrics = new RedisMetrics();
 var myCounter = metrics.counter('pageview', {
   timeGranularity: 'hour',
   expireKeys: true
@@ -32,7 +33,8 @@ useful when we want different settings for different counters. We can also
 specify some default counter settings on the metrics module itself:
 
 ```javascript
-var metrics = require('redis-metrics')({
+var RedisMetrics = require('redis-metrics');
+var metrics = new RedisMetrics({
   counterOptions: {
     timeGranularity: 'hour',
     expireKeys: true

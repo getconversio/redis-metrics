@@ -26,7 +26,8 @@ describe('Metric main', function() {
     });
 
     it('should create an instance without new keyword', function() {
-      var metrics = new RedisMetrics();
+      // This is not encouraged though :-)
+      var metrics = require('../lib/metrics')();
       expect(metrics).to.be.instanceof(RedisMetrics);
     });
 
@@ -69,18 +70,6 @@ describe('Metric main', function() {
 
       new RedisMetrics({ client: client });
       mock.verify();
-    });
-
-    it('should throw an error if the client is not a redis object', function() {
-      var client = { };
-
-      try {
-        new RedisMetrics({ client: client });
-      } catch (e) {
-        return;
-      }
-
-      throw new Error('This should never be called.');
     });
   });
 

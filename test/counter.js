@@ -3,6 +3,7 @@
 var chai = require('chai'),
   sinon = require('sinon'),
   moment = require('moment'),
+  IORedis = require('ioredis'),
   RedisMetrics = require('../lib/metrics'),
   TimestampedCounter = require('../lib/counter'),
   utils = require('../lib/utils');
@@ -15,7 +16,17 @@ describe('Counter', function() {
   var sandbox;
   beforeEach(function(done) {
     sandbox = sinon.sandbox.create();
-    metrics = new RedisMetrics();
+    var host = process.env.REDIS_HOST || 'localhost';
+    var port = process.env.REDIS_PORT || 6379;
+    if (process.env.USE_IOREDIS) {
+      var client = new IORedis(port, host);
+      metrics = new RedisMetrics({ client: client });
+    } else {
+      metrics = new RedisMetrics({
+        host: host,
+        port: port
+      });
+    }
     metrics.client.flushall(done);
   });
 
