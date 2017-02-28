@@ -1,0 +1,16 @@
+version: '2'
+
+services:
+  redis:
+    image: redis:3
+  dev:
+    image: node:6
+    command: npm test
+    volumes:
+     - .:/usr/src/app
+    working_dir: /usr/src/app
+    depends_on:
+     - redis
+    environment:
+     - REDIS_HOST=redis
+     - REDIS_PORT=6379

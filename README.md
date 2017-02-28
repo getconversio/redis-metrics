@@ -10,7 +10,7 @@ In a sense, the libary tries to provide sugar-coated method calls for storing
 and fetching Redis data to report counts and trends. The first design goal is to
 make counting simpler.
 
-Read on below or read more on the [documentation site](http://receiptful.github.io/redis-metrics/).
+Read on below or read more on the [documentation site](http://getconversio.github.io/redis-metrics/).
 
 Install
 -------
@@ -28,6 +28,9 @@ Basic counter:
 // Create an instance
 var RedisMetrics = require('redis-metrics');
 var metrics = new RedisMetrics();
+
+// If you need to catch uncaught exceptions, add an error handler to the client.
+metrics.client.on('error', function(err) { ... });
 
 // Create a counter for a "pageview" event and increment it three times.
 var myCounter = metrics.counter('pageview');
@@ -52,6 +55,9 @@ Time-aware counter.
 // Create an instance
 var RedisMetrics = require('redis-metrics');
 var metrics = new RedisMetrics();
+
+// If you need to catch uncaught exceptions, add an error handler to the client.
+metrics.client.on('error', function(err) { ... });
 
 // Use the timeGranularity option to specify how specific the counter should be
 // when incrementing.
@@ -116,4 +122,4 @@ Documentation
 The internal module documentation is based on [jsdoc](http://usejsdoc.org) and
 can be generated with:
 
-    $ npm run-script docs
+    $ npm run docs
