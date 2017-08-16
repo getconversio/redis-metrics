@@ -8,6 +8,9 @@
   "plugins": [
     "plugins/markdown"
   ],
+  "markdown": {
+    "idInHeadings": true
+  },
   "opts": {
     "tutorials": "docs/",
     "destination": "out/",

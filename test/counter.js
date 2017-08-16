@@ -1279,16 +1279,28 @@ describe('Counter', () => {
       });
     });
 
-    it('should throw an exception if the direction argument is not correct',
-      done => {
-        const counter = new TimestampedCounter(metrics, 'foo');
-        try {
-          counter.top('foo', 'dummy');
-        } catch (e) {
-          return done();
-        }
+    it('should throw an exception if the direction argument is not correct', done => {
+      const counter = new TimestampedCounter(metrics, 'foo');
+      try {
+        counter.top('foo', 'dummy');
+      } catch (e) {
+        return done();
+      }
 
-        throw new Error('This should never be called.');
-      });
+      throw new Error('This should never be called.');
+    });
+
+    it('should work with a real Redis connection', () => {
+      const counter = new TimestampedCounter(metrics, 'foo');
+
+      return counter.incrby(5, '/page1')
+        .then(() => counter.incrby(3, '/page2'))
+        .then(() => counter.top())
+        .then(results => expect(results).to.eql([
+          { '/page1': 5 },
+          { '/page2': 3 }
+        ]));
+    });
+
   });
 });
