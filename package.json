@@ -1,14 +1,16 @@
 {
   "name": "redis-metrics",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "Easy metric tracking and aggregation using Redis",
   "main": "lib/metrics.js",
   "scripts": {
     "exectests": "node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha",
+    "codecov": "node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha --report lcovonly -- -R spec && codecov",
     "jshint": "node_modules/.bin/jshint lib test",
     "jscs": "node_modules/.bin/jscs lib test",
     "lint": "npm run jshint && npm run jscs",
     "test": "npm run exectests && npm run lint",
+    "testci": "npm run lint && npm run codecov",
     "docs": "node_modules/.bin/jsdoc -c jsdoc.json"
   },
   "repository": {
@@ -27,20 +29,19 @@
   "author": "Conversio <dev@conversio.com> (https://conversio.com)",
   "license": "MIT",
   "dependencies": {
-    "jscs": "^2.11.0",
     "lodash": "^3.6.0",
     "moment": "^2.11.1",
-    "q": "^1.2.0",
     "redis": "^2.5.3"
   },
   "devDependencies": {
     "async": "^0.9.0",
-    "chai": "^2.2.0",
+    "chai": "^4.1.1",
     "ioredis": "^2.5.0",
     "istanbul": "^0.3.13",
+    "jscs": "^2.11.0",
     "jsdoc": "^3.4.3",
     "jshint": "^2.7.0",
-    "mocha": "^2.2.4",
+    "mocha": "^3.5.0",
     "sinon": "^1.14.1"
   }
 }

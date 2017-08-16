@@ -1,11 +1,13 @@
 language: node_js
 node_js:
-- '5'
 - '4'
-- '0.12'
-- '0.10'
+- '6'
+- '8'
 services:
 - redis-server
+before_script:
+- npm install -g codecov
+script: npm run testci
 deploy:
   provider: npm
   api_key:
