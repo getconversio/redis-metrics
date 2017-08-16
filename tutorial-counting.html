@@ -40,19 +40,29 @@ functionalities:</p>
 make it a bit rounder. Besides basic counting, the <a href="TimestampedCounter.html"><code>TimestampedCounter</code></a>
 offers a bit more functionality... some extra sugar if you will. Let's take a
 look.</p>
-<h4>Creating a counter</h4><p>Usually, a counter is created with the <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</code></a> function.
+<ol>
+<li><a href="#creating-a-counter">Creating a counter</a></li>
+<li><a href="#incrementing-a-counter">Incrementing a counter</a></li>
+<li><a href="#fetching-a-count">Fetching a count</a></li>
+<li><a href="#fetching-a-count-for-a-time-range">Fetching a count for a time range</a></li>
+<li><a href="#using-an-event-object">Using an event object</a></li>
+<li><a href="#top-n-for-event-objects">Top N for event objects</a></li>
+<li><a href="#using-promises">Using promises</a></li>
+</ol>
+<h3 id="creating-a-counter">Creating a counter</h3>
+<p>Usually, a counter is created with the <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</code></a> function.
 Let's start by creating a counter that is capable of reporting counts with a
 time granularity of one hour:</p>
-<pre class="prettyprint source lang-javascript"><code>var RedisMetrics = require('redis-metrics');
-var metrics = new RedisMetrics();
-var myCounter = metrics.counter('pageview', {
+<pre class="prettyprint source lang-javascript"><code>const RedisMetrics = require('redis-metrics');
+const metrics = new RedisMetrics();
+const myCounter = metrics.counter('pageview', {
   timeGranularity: 'hour',
   expireKeys: true
 };</code></pre><p>Here, we are passing an options object explicitly to the counter. This is
 useful when we want different settings for different counters. We can also
 specify some default counter settings on the metrics module itself:</p>
-<pre class="prettyprint source lang-javascript"><code>var RedisMetrics = require('redis-metrics');
-var metrics = new RedisMetrics({
+<pre class="prettyprint source lang-javascript"><code>const RedisMetrics = require('redis-metrics');
+const metrics = new RedisMetrics({
   counterOptions: {
     timeGranularity: 'hour',
     expireKeys: true
@@ -60,14 +70,15 @@ var metrics = new RedisMetrics({
 });
 
 // Will use the counterOptions object because no options are provided.
-var myCounter = metrics.counter('pageview');</code></pre><h4>Incrementing a counter</h4><p>The counter can be incremented in two ways, using <a href="TimestampedCounter.html#incr"><code>incr</code></a> or <a href="TimestampedCounter.html#incrby"><code>incrby</code></a>:</p>
+const myCounter = metrics.counter('pageview');</code></pre><h3 id="incrementing-a-counter">Incrementing a counter</h3>
+<p>The counter can be incremented in two ways, using <a href="TimestampedCounter.html#incr"><code>incr</code></a> or <a href="TimestampedCounter.html#incrby"><code>incrby</code></a>:</p>
 <pre class="prettyprint source lang-javascript"><code>// Increment by 1
-myCounter.incr(function(err, result) {
+myCounter.incr((err, result) => {
   console.log(result);
 });
 
 // Increment by 5
-myCounter.incrby(5, function(err, result) {
+myCounter.incrby(5, (err, result) => {
   console.log(result);
 });</code></pre><p>The <code>err</code> and <code>result</code> parameters contain the answer from Redis.</p>
 <p>This looks and feels as if we are incrementing a normal Redis counter. Behind
@@ -75,37 +86,39 @@ the scenes, that is exactly what is happening but with a slight twist. Since we
 have chosen a time granularity of an hour, more than one counter is being
 incremented for various timestamps. This does give some extra overhead, but it
 makes it very easy and fast to retrieve a count for a specific period.</p>
-<h4>Fetching a count</h4><p>Since our counter has a time granularity of an hour, we can now answer
+<h3 id="fetching-a-count">Fetching a count</h3>
+<p>Since our counter has a time granularity of an hour, we can now answer
 questions such as: &quot;How many page views do I have so far today?&quot; and &quot;How many
 page views do I have so far this hour?&quot;:</p>
 <pre class="prettyprint source lang-javascript"><code>// Number of page views today.
-myCounter.count('day', function(err, result) {
+myCounter.count('day', (err, result) => {
   console.log(result);
 });
 
 // Number of page views this hour.
-myCounter.count('hour', function(err, result) {
+myCounter.count('hour', (err, result) => {
   console.log(result);
 });</code></pre><p>Of course, we can also get the total number of page views:</p>
 <pre class="prettyprint source lang-javascript"><code>// Number of page views in total.
-myCounter.count(function(err, result) {
+myCounter.count((err, result) => {
   console.log(result);
 });</code></pre><p>In all of the above methods <code>result</code> is single integer.</p>
-<h4>Fetching a count for a time range</h4><p>Fetching a single count for the current time is useful, but often it makes
+<h3 id="fetching-a-count-for-a-time-range">Fetching a count for a time range</h3>
+<p>Fetching a single count for the current time is useful, but often it makes
 sense to view metrics over a period of time. Let's ask the counter &quot;What is my
 page view count for the last 24 hours until now?&quot; using the <a href="TimestampedCounter.html#countRange"><code>countRange</code></a> function:</p>
 <pre class="prettyprint source lang-javascript"><code>// Moment is nice and easy for dates so we'll just use that here.
-var moment = require('moment');
-var yesterday = moment().subtract(24, 'hours');
+const moment = require('moment');
+const yesterday = moment().subtract(24, 'hours');
 
 // No end time specified so use the current time will be used.
-myCounter.countRange('hour', yesterday, function(err, result) {
+myCounter.countRange('hour', yesterday, (err, result) => {
   console.log(result);
 });
 
 // Use explicit end time.
-var now = moment();
-myCounter.countRange('hour', yesterday, now, function(err, result) {
+const now = moment();
+myCounter.countRange('hour', yesterday, now, (err, result) => {
   console.log(result);
 });</code></pre><p>The start and end parameters can be anything that that the
 <a href="http://momentjs.com/docs/#/parsing/"><code>moment(...)</code></a> constructor understands.</p>
@@ -119,7 +132,8 @@ above query, <code>result</code> could thus be:</p>
   '2015-04-16T10:00:00+00:00': 519,
   '2015-04-16T11:00:00+00:00': 231
 }</code></pre><p><strong>Warning</strong>: The timestamps are <em>always</em> UTC.</p>
-<h3>Using an event object</h3><p>For many use cases, it makes sense to track an event in a more specific
+<h3 id="using-an-event-object">Using an event object</h3>
+<p>For many use cases, it makes sense to track an event in a more specific
 context. For example, you might want to track the individual page views of
 specific pages in your app such as &quot;/about&quot; and &quot;/contact&quot;. You could create
 separate counters for each of these pages, but for this specific use case, you
@@ -127,12 +141,12 @@ might want to use &quot;event objects&quot;.</p>
 <p>Using the feature is easy and best shown by example. We can use the same page
 view counter from before:</p>
 <pre class="prettyprint source lang-javascript"><code>// Increment the page view counter for the event object &quot;/contact&quot;.
-myCounter.incr('/contact', function(err, result) {
+myCounter.incr('/contact', (err, result) => {
   console.log(result);
 });
 
 // Increment the page view counter for the event object &quot;/about&quot;.
-myCounter.incr('/about', function(err, result) {
+myCounter.incr('/about', (err, result) => {
   console.log(result);
 });</code></pre><p>When using an event object, internally in Redis the event objects are
 incremented in a sorted set on the given key. After calling the two operations
@@ -140,22 +154,22 @@ above, we will thus have a Redis key called &quot;pageview&quot; which contains 
 set</a> with &quot;/about&quot; and &quot;/contact&quot;.
 Reporting a count for an event object is similar to before:</p>
 <pre class="prettyprint source lang-javascript"><code>// Number of page views today for about page
-myCounter.count('day', '/about', function(err, result) {
+myCounter.count('day', '/about', (err, result) => {
   console.log(result);
 });
 
 // Number of page views this hour for the contact page
-myCounter.count('hour', '/contact', function(err, result) {
+myCounter.count('hour', '/contact', (err, result) => {
   console.log(result);
 });</code></pre><p>Time ranges work as well for event objects. For example, I have this question
 &quot;Show me the page view count for the last 24 hours for the /about page&quot; and
 here is the answer:</p>
 <pre class="prettyprint source lang-javascript"><code>// Moment is nice and easy for dates so we'll just use that here.
-var moment = require('moment');
-var yesterday = moment().subtract(24, 'hours');
-var now = moment();
+const moment = require('moment');
+const yesterday = moment().subtract(24, 'hours');
+const now = moment();
 
-myCounter.countRange('hour', yesterday, now, '/about', function(err, result) {
+myCounter.countRange('hour', yesterday, now, '/about', (err, result) => {
   console.log(result);
 });</code></pre><p>The output of the above query is similar to before:</p>
 <pre class="prettyprint source lang-json"><code>{
@@ -166,13 +180,38 @@ myCounter.countRange('hour', yesterday, now, '/about', function(err, result) {
   '2015-04-16T11:00:00+00:00': 32
 }</code></pre><p><strong>Warning</strong>: When using <a href="TimestampedCounter.html#countRange"><code>countRange</code></a> for
 event objects, the end date is mandatory.</p>
-<h4>Top N for event objects</h4><p>Because event objects are stored in <a href="http://redis.io/topics/data-types#sorted-sets">sorted
+<h3 id="top-n-for-event-objects">Top N for event objects</h3>
+<p>Because event objects are stored in <a href="http://redis.io/topics/data-types#sorted-sets">sorted
 sets</a>, we automatically get some
 benefits from Redis. For example, it is very easy to get a list of the top 10
 visited pages for our counter or even a sorted list of all pages by page count.</p>
-<p>Since we are at a very early stage in the project, this feature has not been
-added yet, but it will in the near future because it fits our own use cases
-very well. Stay tuned :-)</p>
+<p>This feature is implemented in the <a href="TimestampedCounter.html#top"><code>top</code></a>
+function and here is a simple example of how to use it:</p>
+<pre class="prettyprint source lang-javascript"><code>// Increment some counters with events objects as above
+myCounter.incrby(5, '/contact')
+  .then(() => myCounter.incrby(3, '/about'))
+  .then(() => myCounter.top('total', 'desc'))
+  .then(topPages => console.log(topPages));</code></pre><p>The output for <code>top</code> is an array of the top results, e.g.:</p>
+<pre class="prettyprint source lang-json"><code>[
+  { '/contact': 5 }
+  { '/about': 3 }
+]</code></pre><h3 id="using-promises">Using promises</h3>
+<p>All functions that have been discussed so far return a native Node <code>Promise</code>.
+Here are a few examples that are equivalent to the callback versions:</p>
+<pre class="prettyprint source lang-javascript"><code>// Increment by 1
+myCounter.incr()
+  .then(result => console.log(result))
+  .catch(err => console.error(err));
+
+// Increment by 5
+myCounter.incrby(5)
+  .then(result => console.log(result))
+  .catch(err => console.error(err));
+
+// Number of page views today.
+myCounter.count('day')
+  .then(result => console.log(result))
+  .catch(err => console.error(err));</code></pre>
 </article>
 
 </section>
@@ -186,7 +225,7 @@ very well. Stay tuned :-)</p>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Tue Feb 28 2017 10:54:28 GMT+0100 (CET)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.4</a> on Wed Aug 16 2017 18:20:43 GMT+0200 (CEST)
 </footer>
 
 <script> prettyPrint(); </script>

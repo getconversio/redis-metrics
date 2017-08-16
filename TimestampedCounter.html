@@ -28,7 +28,19 @@
 
 <header>
     
-        <h2>TimestampedCounter</h2>
+        <h2><span class="attribs"><span class="type-signature"></span></span>TimestampedCounter<span class="signature">(metrics, key, options)</span><span class="type-signature"></span></h2>
+        
+            <div class="class-description"><p>A timestamped event counter.</p>
+<p>The timestamped counter stores one or more Redis keys based on the given
+event name and time granularity appends a timestamp to the key before
+storing the key in Redis. The counter can then report an overall aggregated
+count or a specific count for a time range, depending on the chosen
+granularity of the timestamp.</p>
+<p>If no time granularity is chosen at creation time, the counter will work
+just like a global counter for the given key, i.e. events will not be
+timestamped.</p>
+<p><strong>Notice</strong>: The constructor for this class is usually not called directly
+but through the <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</code></a> function.</p></div>
         
     
 </header>
@@ -39,26 +51,16 @@
         
 
     
+    <h2>Constructor</h2>
+    
 
+    
     <h4 class="name" id="TimestampedCounter"><span class="type-signature"></span>new TimestampedCounter<span class="signature">(metrics, key, options)</span><span class="type-signature"></span></h4>
+    
 
     
 
 
-
-<div class="description">
-    <p>A timestamped event counter.</p>
-<p>The timestamped counter stores one or more Redis keys based on the given
-event name and time granularity appends a timestamp to the key before
-storing the key in Redis. The counter can then report an overall aggregated
-count or a specific count for a time range, depending on the chosen
-granularity of the timestamp.</p>
-<p>If no time granularity is chosen at creation time, the counter will work
-just like a global counter for the given key, i.e. events will not be
-timestamped.</p>
-<p><strong>Notice</strong>: The constructor for this class is usually not called directly
-but through the <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</code></a> function.</p>
-</div>
 
 
 
@@ -197,7 +199,7 @@ but through the <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line102">line 102</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line138">line 138</a>
     </li></ul></dd>
     
 
@@ -223,6 +225,8 @@ but through the <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</
 
 
 
+
+
     
     </div>
 
@@ -232,7 +236,9 @@ but through the <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</
 
     
 
-     
+    
+
+    
 
     
 
@@ -246,7 +252,9 @@ but through the <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</
 
     
 
+    
     <h4 class="name" id="count"><span class="type-signature"></span>count<span class="signature">(timeGranularity<span class="signature-attributes">opt</span>, eventObj<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    
 
     
 
@@ -453,7 +461,7 @@ not incremented at this granularity level in the first place.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line298">line 298</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line306">line 306</a>
     </li></ul></dd>
     
 
@@ -501,17 +509,19 @@ not incremented at this granularity level in the first place.</p>
     
 
 
+
+
     <h5>Examples</h5>
     
-    <pre class="prettyprint"><code>myCounter.count(function(err, result) {
+    <pre class="prettyprint"><code>myCounter.count((err, result) => {
   console.log(result); // Outputs the global count
 });</code></pre>
 
-    <pre class="prettyprint"><code>myCounter.count('year', function(err, result) {
+    <pre class="prettyprint"><code>myCounter.count('year', (err, result) => {
   console.log(result); // Outputs the count for the current year
 });</code></pre>
 
-    <pre class="prettyprint"><code>myCounter.count('year', '/foo.html', function(err, result) {
+    <pre class="prettyprint"><code>myCounter.count('year', '/foo.html', (err, result) => {
   // Outputs the count for the current year for the event object '/foo.html'
   console.log(result);
 });</code></pre>
@@ -523,7 +533,9 @@ not incremented at this granularity level in the first place.</p>
 
     
 
+    
     <h4 class="name" id="countRange"><span class="type-signature"></span>countRange<span class="signature">(timeGranularity, startDate, endDate<span class="signature-attributes">opt</span>, eventObj<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    
 
     
 
@@ -819,7 +831,7 @@ specific time granularity level.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line350">line 350</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line357">line 357</a>
     </li></ul></dd>
     
 
@@ -868,12 +880,16 @@ specific time granularity level.</p>
 
 
 
+
+
         
             
 
     
 
+    
     <h4 class="name" id="getKeys"><span class="type-signature"></span>getKeys<span class="signature">()</span><span class="type-signature"> &rarr; {Array}</span></h4>
+    
 
     
 
@@ -925,7 +941,7 @@ current point in time and will be written to Redis.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line127">line 127</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line162">line 162</a>
     </li></ul></dd>
     
 
@@ -969,12 +985,16 @@ current point in time and will be written to Redis.</p>
 
 
 
+
+
         
             
 
     
 
+    
     <h4 class="name" id="getKeyTTL"><span class="type-signature"></span>getKeyTTL<span class="signature">(key)</span><span class="type-signature"> &rarr; {number}</span></h4>
+    
 
     
 
@@ -1075,7 +1095,7 @@ current point in time and will be written to Redis.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line150">line 150</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line185">line 185</a>
     </li></ul></dd>
     
 
@@ -1123,12 +1143,16 @@ current point in time and will be written to Redis.</p>
 
 
 
+
+
         
             
 
     
 
+    
     <h4 class="name" id="incr"><span class="type-signature"></span>incr<span class="signature">(eventObj<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    
 
     
 
@@ -1284,7 +1308,7 @@ For this use case, the eventObj parameter is a good fit.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line195">line 195</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line230">line 230</a>
     </li></ul></dd>
     
 
@@ -1333,12 +1357,16 @@ For this use case, the eventObj parameter is a good fit.</p>
 
 
 
+
+
         
             
 
     
 
+    
     <h4 class="name" id="incrby"><span class="type-signature"></span>incrby<span class="signature">(amount, eventObj<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    
 
     
 
@@ -1521,7 +1549,7 @@ For this use case, the eventObj parameter is a good fit.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line211">line 211</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line246">line 246</a>
     </li></ul></dd>
     
 
@@ -1577,12 +1605,16 @@ For this use case, the eventObj parameter is a good fit.</p>
 
 
 
+
+
         
             
 
     
 
+    
     <h4 class="name" id="top"><span class="type-signature"></span>top<span class="signature">(timeGranularity<span class="signature-attributes">opt</span>, direction<span class="signature-attributes">opt</span>, startingAt<span class="signature-attributes">opt</span>, limit<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    
 
     
 
@@ -1857,7 +1889,7 @@ answer to questions such as &quot;what is the rank for the current day&quot;.</p
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line466">line 466</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line447">line 447</a>
     </li></ul></dd>
     
 
@@ -1905,13 +1937,15 @@ answer to questions such as &quot;what is the rank for the current day&quot;.</p
     
 
 
+
+
     <h5>Examples</h5>
     
-    <pre class="prettyprint"><code>myCounter.top(function(err, result) {
+    <pre class="prettyprint"><code>myCounter.top((err, result) => {
   console.log(result); // Outputs the global rank
 });</code></pre>
 
-    <pre class="prettyprint"><code>myCounter.top('year', function(err, result) {
+    <pre class="prettyprint"><code>myCounter.top('year', (err, result) => {
   console.log(result); // Outputs the rank for the current year
 });</code></pre>
 
@@ -1939,7 +1973,7 @@ answer to questions such as &quot;what is the rank for the current day&quot;.</p
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Tue Feb 28 2017 10:54:28 GMT+0100 (CET)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.4</a> on Wed Aug 16 2017 18:20:43 GMT+0200 (CEST)
 </footer>
 
 <script> prettyPrint(); </script>
