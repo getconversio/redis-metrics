@@ -14,5 +14,6 @@
     "disallowSpacesInAnonymousFunctionExpression": {
         "beforeOpeningRoundBrace": true
     },
-    "requireSpacesInAnonymousFunctionExpression": null
+    "requireSpacesInAnonymousFunctionExpression": null,
+    "maximumLineLength": 100
 }

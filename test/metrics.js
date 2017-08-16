@@ -1,38 +1,32 @@
 'use strict';
 
-var redis = require('redis'),
+const redis = require('redis'),
   sinon = require('sinon'),
   chai = require('chai'),
   RedisMetrics = require('../lib/metrics'),
   TimestampedCounter = require('../lib/counter');
 
-var expect = chai.expect;
+const expect = chai.expect;
 
-describe('Metric main', function() {
+describe('Metric main', () => {
 
-  var sandbox;
-  beforeEach(function() {
+  let sandbox;
+  beforeEach(() => {
     sandbox = sinon.sandbox.create();
   });
 
-  afterEach(function() {
+  afterEach(() => {
     sandbox.restore();
   });
 
-  describe('constructor', function() {
-    it('should create an instance with new keyword', function() {
-      var metrics = new RedisMetrics();
+  describe('constructor', () => {
+    it('should create an instance with new keyword', () => {
+      const metrics = new RedisMetrics();
       expect(metrics).to.be.instanceof(RedisMetrics);
     });
 
-    it('should create an instance without new keyword', function() {
-      // This is not encouraged though :-)
-      var metrics = require('../lib/metrics')();
-      expect(metrics).to.be.instanceof(RedisMetrics);
-    });
-
-    it('should create a redis client', function() {
-      var mock = sandbox.mock(redis)
+    it('should create a redis client', () => {
+      const mock = sandbox.mock(redis)
         .expects('createClient')
         .once()
         .withExactArgs();
@@ -40,8 +34,8 @@ describe('Metric main', function() {
       mock.verify();
     });
 
-    it('should create a redis client with host and port if passed', function() {
-      var mock = sandbox.mock(redis)
+    it('should create a redis client with host and port if passed', () => {
+      const mock = sandbox.mock(redis)
         .expects('createClient')
         .once()
         .withExactArgs(1234, 'abcd', {});
@@ -49,11 +43,11 @@ describe('Metric main', function() {
       mock.verify();
     });
 
-    it('should create a redis client with options if provided', function() {
+    it('should create a redis client with options if provided', () => {
       // jscs:disable requireCamelCaseOrUpperCaseIdentifiers
-      var redisOpts = { no_ready_check: true };
+      const redisOpts = { no_ready_check: true };
 
-      var mock = sandbox.mock(redis)
+      const mock = sandbox.mock(redis)
         .expects('createClient')
         .once()
         .withExactArgs(redisOpts);
@@ -61,10 +55,10 @@ describe('Metric main', function() {
       mock.verify();
     });
 
-    it('should recycle the client if passed as an option', function() {
-      var client = redis.createClient();
+    it('should recycle the client if passed as an option', () => {
+      const client = redis.createClient();
 
-      var mock = sandbox.mock(redis)
+      const mock = sandbox.mock(redis)
         .expects('createClient')
         .never();
 
@@ -73,33 +67,31 @@ describe('Metric main', function() {
     });
   });
 
-  describe('counter', function() {
-    var metrics;
-    beforeEach(function() {
-      metrics = new RedisMetrics();
-    });
+  describe('counter', () => {
+    let metrics;
+    beforeEach(() => metrics = new RedisMetrics());
 
-    it('should return a counter for a key', function() {
-      var counter = metrics.counter('foo');
+    it('should return a counter for a key', () => {
+      const counter = metrics.counter('foo');
       expect(counter).to.be.instanceof(TimestampedCounter);
     });
 
-    it('should pass the options object to the counter constructor', function() {
-      var options = {
+    it('should pass the options object to the counter constructor', () => {
+      const options = {
         timeGranularity: 1
       };
-      var counter = metrics.counter('foo', options);
+      const counter = metrics.counter('foo', options);
       expect(counter.options.timeGranularity).to.equal(1);
     });
 
-    it('should use the default options when none are provided', function() {
+    it('should use the default options when none are provided', () => {
       metrics = new RedisMetrics({
         counterOptions: {
           timeGranularity: 2
         }
       });
 
-      var counter = metrics.counter('foo');
+      const counter = metrics.counter('foo');
       expect(counter.options.timeGranularity).to.equal(2);
     });
   });

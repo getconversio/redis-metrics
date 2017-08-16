@@ -12,6 +12,9 @@ make counting simpler.
 
 Read on below or read more on the [documentation site](http://getconversio.github.io/redis-metrics/).
 
+[![Build Status](https://travis-ci.org/getconversio/redis-metrics.svg?branch=master)](https://travis-ci.org/getconversio/redis-metrics)
+[![codecov](https://codecov.io/gh/getconversio/redis-metrics/branch/master/graph/badge.svg)](https://codecov.io/gh/getconversio/redis-metrics)
+
 Install
 -------
 
