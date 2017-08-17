@@ -6,6 +6,7 @@ const chai = require('chai'),
   IORedis = require('ioredis'),
   RedisMetrics = require('../lib/metrics'),
   TimestampedCounter = require('../lib/counter'),
+  constants = require('../lib/constants'),
   utils = require('../lib/utils');
 
 const expect = chai.expect;
@@ -152,6 +153,34 @@ describe('Counter', () => {
       expect(keys).to.include('c:foo:2015010203');
       expect(keys).to.include('c:foo:201501020304');
       expect(keys).to.include('c:foo:20150102030405');
+    });
+
+    it('should support a custom time', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'second'
+      });
+      const keys = counter.getKeys(moment.utc('2017-12-13T14:15:16Z'));
+      expect(keys).to.be.instanceof(Array);
+      expect(keys).to.have.length(7);
+      expect(keys).to.include('c:foo');
+      expect(keys).to.include('c:foo:2017');
+      expect(keys).to.include('c:foo:201712');
+      expect(keys).to.include('c:foo:2017121314');
+      expect(keys).to.include('c:foo:201712131415');
+      expect(keys).to.include('c:foo:20171213141516');
+    });
+
+    it('should support a custom time and granularity', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'second'
+      });
+      const keys = counter.getKeys(moment.utc('2017-12-13T14:15:16Z'), 'month');
+      // Note the counter granularity is set to second, but we only want months.
+      expect(keys).to.be.instanceof(Array);
+      expect(keys).to.have.length(3);
+      expect(keys).to.include('c:foo');
+      expect(keys).to.include('c:foo:2017');
+      expect(keys).to.include('c:foo:201712');
     });
   });
 
@@ -1301,6 +1330,167 @@ describe('Counter', () => {
           { '/page2': 3 }
         ]));
     });
+  });
 
+  describe('trimEvents', () => {
+    let counter;
+    beforeEach(() => {
+      counter = new TimestampedCounter(metrics, 'fruits', {
+        timeGranularity: 'hour'
+      });
+      return Promise.all([
+        counter.incrby(10, 'apples'),
+        counter.incrby(8, 'oranges'),
+        counter.incrby(7, 'pears'),
+        counter.incrby(5, 'peaches'),
+        counter.incrby(2, 'mangos'),
+      ]);
+    });
+
+    it('should throw an exception if the direction argument is not correct', done => {
+      try {
+        counter.trimEvents('dummy');
+      } catch (e) {
+        return done();
+      }
+
+      throw new Error('This should never be called.');
+    });
+
+    it('should resolve to a failure if a subcommand fails', done => {
+      sandbox.stub(metrics.client, 'zremrangebyrank')
+        .yields(new Error('oh no'));
+      counter.trimEvents()
+        .then(() => done(new Error('should not be here')))
+        .catch(err => {
+          expect(err).to.be.an('error');
+          expect(err.message).to.equal('oh no');
+          done();
+        });
+    });
+
+    it('should call the callback with an error if a subcommand fails', done => {
+      sandbox.stub(metrics.client, 'zremrangebyrank')
+        .yields(new Error('oh no'));
+      counter.trimEvents(err => {
+        try {
+          expect(err).to.be.an('error');
+          expect(err.message).to.equal('oh no');
+          done();
+        } catch (e) {
+          done(e);
+        }
+      });
+    });
+
+    it('should trim to 1000 elements by default', () => {
+      // This means it keeps all of them, because there's only 5 elements.
+      return counter.trimEvents()
+        .then(removed => {
+          expect(removed).to.equal(0);
+          return counter.top();
+        })
+        .then(topN => expect(topN.length).to.equal(5));
+    });
+
+    it('should support descending trim', () => {
+      return counter.trimEvents('desc', 3)
+        .then(removed => {
+          // It removed 2 from total, 2 from year, 2 from month and 2 from day.
+          expect(removed).to.equal(8);
+          return counter.top();
+        })
+        .then(topN => {
+          expect(topN.length).to.equal(3);
+          expect(topN).to.eql([
+            { apples: 10 },
+            { oranges: 8 },
+            { pears: 7 }
+          ]);
+        });
+    });
+
+    it('should support ascending trim', () => {
+      return counter.trimEvents('asc', 3)
+        .then(removed => {
+          // It removed 2 from total, 2 from year, 2 from month and 2 from day.
+          expect(removed).to.equal(8);
+          return counter.top();
+        })
+        .then(topN => {
+          expect(topN.length).to.equal(3);
+          // It kept the lowest scores, but the top() function returns
+          // descending sort by default.
+          expect(topN).to.eql([
+            { pears: 7 },
+            { peaches: 5 },
+            { mangos: 2 }
+          ]);
+        });
+    });
+
+    it('should support a callback', done => {
+      counter.trimEvents('desc', 3, (err, removed) => {
+        try {
+          expect(err).to.equal(null);
+          expect(removed).to.equal(8);
+          done();
+        } catch (e) {
+          done(e);
+        }
+      });
+    });
+
+    context('given a counter with only total granularity', () => {
+      beforeEach(() => {
+        // This is cheating a bit since the counter has already been incremented
+        // at the hourly level.
+        counter.options.timeGranularity = constants.timeGranularities.none;
+      });
+
+      it('should trim to 1000 elements by default', () => {
+        // This means it keeps all of them, because there's only 5 elements.
+        return counter.trimEvents()
+          .then(removed => {
+            expect(removed).to.equal(0);
+            return counter.top();
+          })
+          .then(topN => expect(topN.length).to.equal(5));
+      });
+
+      it('should support descending trim', () => {
+        return counter.trimEvents('desc', 3)
+          .then(removed => {
+            expect(removed).to.equal(2);
+            return counter.top();
+          })
+          .then(topN => {
+            expect(topN.length).to.equal(3);
+            expect(topN).to.eql([
+              { apples: 10 },
+              { oranges: 8 },
+              { pears: 7 }
+            ]);
+          });
+      });
+
+      it('should support ascending trim', () => {
+        return counter.trimEvents('asc', 3)
+          .then(removed => {
+            expect(removed).to.equal(2);
+            return counter.top();
+          })
+          .then(topN => {
+            expect(topN.length).to.equal(3);
+            // It kept the lowest scores, but the top() function returns
+            // descending sort by default.
+            expect(topN).to.eql([
+              { pears: 7 },
+              { peaches: 5 },
+              { mangos: 2 }
+            ]);
+          });
+      });
+    });
   });
 });
