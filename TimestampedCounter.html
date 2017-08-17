@@ -199,7 +199,7 @@ but through the <a href="RedisMetrics.html#counter"><code>RedisMetrics#counter</
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line138">line 138</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line166">line 166</a>
     </li></ul></dd>
     
 
@@ -461,7 +461,7 @@ not incremented at this granularity level in the first place.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line306">line 306</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line329">line 329</a>
     </li></ul></dd>
     
 
@@ -831,7 +831,7 @@ specific time granularity level.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line357">line 357</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line380">line 380</a>
     </li></ul></dd>
     
 
@@ -888,7 +888,7 @@ specific time granularity level.</p>
     
 
     
-    <h4 class="name" id="getKeys"><span class="type-signature"></span>getKeys<span class="signature">()</span><span class="type-signature"> &rarr; {Array}</span></h4>
+    <h4 class="name" id="getKeys"><span class="type-signature"></span>getKeys<span class="signature">(time<span class="signature-attributes">opt</span>, timeGranularity<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Array}</span></h4>
     
 
     
@@ -897,7 +897,7 @@ specific time granularity level.</p>
 
 <div class="description">
     <p>Return a list of Redis keys that are associated with this counter at the
-current point in time and will be written to Redis.</p>
+current point in time (default) and will be written to Redis.</p>
 </div>
 
 
@@ -906,6 +906,114 @@ current point in time and will be written to Redis.</p>
 
 
 
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>time</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Moment</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    now
+                
+                </td>
+            
+
+            <td class="description last"><p>A specific time to get keys for.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>timeGranularity</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-constants.html#~timeGranularities">module:constants~timeGranularities</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"><p>The
+  granularity level to return keys for. The default is the granularity from
+  the options.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
 
 
 
@@ -941,7 +1049,7 @@ current point in time and will be written to Redis.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line162">line 162</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line194">line 194</a>
     </li></ul></dd>
     
 
@@ -1095,7 +1203,7 @@ current point in time and will be written to Redis.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line185">line 185</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line208">line 208</a>
     </li></ul></dd>
     
 
@@ -1308,7 +1416,7 @@ For this use case, the eventObj parameter is a good fit.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line230">line 230</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line253">line 253</a>
     </li></ul></dd>
     
 
@@ -1549,7 +1657,7 @@ For this use case, the eventObj parameter is a good fit.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line246">line 246</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line269">line 269</a>
     </li></ul></dd>
     
 
@@ -1731,6 +1839,8 @@ answer to questions such as &quot;what is the rank for the current day&quot;.</p
             
                 <td class="default">
                 
+                    desc
+                
                 </td>
             
 
@@ -1768,10 +1878,12 @@ answer to questions such as &quot;what is the rank for the current day&quot;.</p
             
                 <td class="default">
                 
+                    0
+                
                 </td>
             
 
-            <td class="description last"><p>Optional starting row, default 0</p></td>
+            <td class="description last"><p>Optional starting row.</p></td>
         </tr>
 
     
@@ -1805,10 +1917,12 @@ answer to questions such as &quot;what is the rank for the current day&quot;.</p
             
                 <td class="default">
                 
+                    -1
+                
                 </td>
             
 
-            <td class="description last"><p>Optional number of results to return, default -1</p></td>
+            <td class="description last"><p>Optional number of results to return.</p></td>
         </tr>
 
     
@@ -1889,7 +2003,7 @@ answer to questions such as &quot;what is the rank for the current day&quot;.</p
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line447">line 447</a>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line470">line 470</a>
     </li></ul></dd>
     
 
@@ -1952,6 +2066,283 @@ answer to questions such as &quot;what is the rank for the current day&quot;.</p
 
 
         
+            
+
+    
+
+    
+    <h4 class="name" id="trimEvents"><span class="type-signature"></span>trimEvents<span class="signature">(keepDirection<span class="signature-attributes">opt</span>, limit<span class="signature-attributes">opt</span>, callback<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Permanently remove event objects for this counter so only the top-N
+elements remain in either descending (the default) or ascending order.</p>
+<p>The event objects are removed with Redis' removal by rank for sorted sets
+(<a href="https://redis.io/commands/zremrangebyrank">ZREMRANGEBYRANK</a>).</p>
+<p>The removal happens at each granularity level and only supports daily
+granularity and above (month, year, total) to optimize for the number of
+Redis keys to consider. It removes data going 5 years back in time.</p>
+<p>If the function is used too often, there is a risk that the top-N elements
+will stay the same forever, because lower-ranking elements get removed
+before their scores have a change to increase.</p>
+<p>Therefore, the function should only be used to try and reclaim space for
+big counters with a lot of event objects, and only rarely used.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>keepDirection</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    desc
+                
+                </td>
+            
+
+            <td class="description last"><p>Sort direction for the top-N
+elements to keep, can be &quot;asc&quot; or &quot;desc&quot;.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>limit</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">integer</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    1000
+                
+                </td>
+            
+
+            <td class="description last"><p>Number of results to keep.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>callback</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"><p>Callback</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+    <dt class="tag-since">Since:</dt>
+    <dd class="tag-since"><ul class="dummy"><li>1.1.0</li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="counter.js.html">counter.js</a>, <a href="counter.js.html#line548">line 548</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>Resolves when the values have been removed.</p>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Examples</h5>
+    
+    <pre class="prettyprint"><code>// Keeps the top-5 elements with highest score
+myCounter.trimEvents('desc', 5)</code></pre>
+
+    <pre class="prettyprint"><code>// Keeps the top-5 elements with lowest score
+myCounter.trimEvents('asc', 5)</code></pre>
+
+
+
+        
     
 
     
@@ -1967,13 +2358,13 @@ answer to questions such as &quot;what is the rank for the current day&quot;.</p
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-constants.html">constants</a></li></ul><h3>Classes</h3><ul><li><a href="RedisMetrics.html">RedisMetrics</a></li><li><a href="TimestampedCounter.html">TimestampedCounter</a></li></ul><h3>Tutorials</h3><ul><li><a href="tutorial-counting.html">Counting stuff</a></li></ul><h3>Global</h3><ul><li><a href="global.html#rankParser">rankParser</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-constants.html">constants</a></li></ul><h3>Classes</h3><ul><li><a href="RedisMetrics.html">RedisMetrics</a></li><li><a href="TimestampedCounter.html">TimestampedCounter</a></li></ul><h3>Tutorials</h3><ul><li><a href="tutorial-counting.html">Counting stuff</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.4</a> on Wed Aug 16 2017 18:20:43 GMT+0200 (CEST)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.4</a> on Thu Aug 17 2017 16:04:30 GMT+0200 (CEST)
 </footer>
 
 <script> prettyPrint(); </script>
