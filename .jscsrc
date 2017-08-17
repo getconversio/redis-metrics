@@ -15,5 +15,6 @@
         "beforeOpeningRoundBrace": true
     },
     "requireSpacesInAnonymousFunctionExpression": null,
-    "maximumLineLength": 100
+    "maximumLineLength": 100,
+    "requireShorthandArrowFunctions": false
 }
