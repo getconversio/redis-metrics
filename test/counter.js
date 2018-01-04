@@ -12,9 +12,9 @@ const chai = require('chai'),
 const expect = chai.expect;
 
 describe('Counter', () => {
-
   let metrics;
   let sandbox;
+
   beforeEach(done => {
     sandbox = sinon.sandbox.create();
     const host = process.env.REDIS_HOST || 'localhost';
@@ -37,7 +37,6 @@ describe('Counter', () => {
   });
 
   describe('constructor', () => {
-
     it('should set some defaults', () => {
       const counter = new TimestampedCounter(metrics, 'foo');
       expect(counter.metrics).to.equal(metrics);
@@ -410,7 +409,6 @@ describe('Counter', () => {
   });
 
   describe('incr with event object', () => {
-
     it('should work with an event object when a counter expires', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         expireKeys: true,
@@ -460,7 +458,6 @@ describe('Counter', () => {
         expect(utils.parseIntArray(results)).to.deep.equal([1, 1]);
       });
     });
-
   });
 
   describe('incrby', () => {
@@ -616,7 +613,6 @@ describe('Counter', () => {
   });
 
   describe('incrby with event object', () => {
-
     it('should work with an event object', done => {
       const counter = new TimestampedCounter(metrics, 'foo');
 
@@ -638,7 +634,6 @@ describe('Counter', () => {
       })
       .catch(done);
     });
-
   });
 
   describe('count', () => {
@@ -822,8 +817,6 @@ describe('Counter', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'second'
       });
-
-      // Increment 2014 once and 2015 twice
 
       const start = moment.utc({ year: 2015, second: 0 });
       const end = moment.utc({ year: 2015, second: 1 });
@@ -1491,6 +1484,102 @@ describe('Counter', () => {
             ]);
           });
       });
+    });
+  });
+
+  describe('zero', () => {
+    it('clears counts at the second level', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'second'
+      });
+
+      const clock = sandbox.useFakeTimers(new Date('2015-01-01').getTime());
+      return counter.incr()
+        .then(() => {
+          clock.tick(1000);
+          return counter.incr();
+        })
+        .then(() => counter.incr())
+        .then(() => counter.count('total'))
+        .then(count => {
+          expect(count).to.equal(3);
+          return counter.zero();
+        })
+        .then(() => counter.count('total'))
+        .then(count => expect(count).to.equal(0));
+    });
+
+    it('clears counts with no granularity', () => {
+      const counter = new TimestampedCounter(metrics, 'foo');
+
+      return Promise.all([counter.incr(), counter.incr()])
+        .then(() => counter.count('total'))
+        .then(count => {
+          expect(count).to.equal(2);
+          return counter.zero();
+        })
+        .then(() => counter.count('total'))
+        .then(count => expect(count).to.equal(0));
+    });
+
+    it('clears counts for an event object', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'year'
+      });
+
+      const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
+      return Promise.all([
+        counter.incrby(2, 'five'),
+        counter.incr('two')
+      ])
+      .then(() => {
+        clock.tick(1000 * 60 * 60 * 24 * 365);
+        return Promise.all([
+          counter.incrby(3, 'five'),
+          counter.incr('two')
+        ]);
+      })
+      .then(() => Promise.all([counter.count('total', 'five'), counter.count('total', 'two')]))
+      .then(res => {
+        expect(res[0]).to.equal(5);
+        expect(res[1]).to.equal(2);
+        return counter.zero('five');
+      })
+      .then(() => Promise.all([counter.count('total', 'five'), counter.count('total', 'two')]))
+      .then(res => {
+        expect(res[0]).to.equal(0);
+        expect(res[1]).to.equal(2);
+      });
+    });
+
+    it('clears the ranges as well', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'day'
+      });
+
+      const start = moment.utc({ year: 2015, day: 1 });
+      const end = moment.utc({ year: 2015, day: 2 });
+      const expectedBefore = {};
+      expectedBefore[start.format()] = 1;
+      expectedBefore[end.format()] = 2;
+
+      const expectedAfter = {};
+      expectedAfter[start.format()] = 0;
+      expectedAfter[end.format()] = 0;
+
+      const clock = sandbox.useFakeTimers(new Date('2015-01-01').getTime());
+      return counter.incr()
+        .then(() => {
+          clock.tick(1000 * 60 * 60 * 24);
+          return counter.incrby(2);
+        })
+        .then(() => counter.countRange('day', start, end))
+        .then(result => {
+          expect(result).to.deep.equal(expectedBefore);
+          return counter.zero();
+        })
+        .then(() => counter.countRange('day', start, end))
+        .then(result => expect(result).to.deep.equal(expectedAfter));
     });
   });
 });
