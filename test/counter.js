@@ -1044,7 +1044,7 @@ describe('Counter', () => {
         .catch(done);
     });
 
-    it('should return a single num if total gran is selected', done => {
+    it('should return a single num if "total" granularity is selected', done => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
@@ -1322,6 +1322,244 @@ describe('Counter', () => {
           { '/page1': 5 },
           { '/page2': 3 }
         ]));
+    });
+  });
+
+  describe('topRange', () => {
+    it('should return toplists within the given range', done => {
+      const counter = new TimestampedCounter(metrics, 'foo', { timeGranularity: 'year' });
+
+      const start = moment.utc({ year: 2014 });
+      const end = moment.utc({ year: 2015 });
+      const expected = {};
+      expected[start.format()] = [{ two: 2 }, { one: 1 }];
+      expected[end.format()] = [{ two: 4 }, { one: 2 }];
+
+      const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
+
+      Promise.all([
+        counter.incr('one'),
+        counter.incr('two'),
+        counter.incr('two')
+      ])
+      .then(() => {
+        clock.tick(1000 * 60 * 60 * 24 * 365);
+        return Promise.all([
+          counter.incr('one'),
+          counter.incr('one'),
+          counter.incr('two'),
+          counter.incr('two'),
+          counter.incr('two'),
+          counter.incr('two')
+        ]);
+      })
+      .then(() => counter.topRange(start, end, 'year'))
+      .then(result => {
+        // Check promise
+        expect(result).to.deep.equal(expected);
+
+        // Check callback
+        counter.topRange(start, end, 'year', (err, res) => {
+          expect(res).to.deep.equal(expected);
+          done();
+        });
+      })
+      .catch(done);
+    });
+
+    it('should merge toplists within the given range if given "total" granularity', done => {
+      const counter = new TimestampedCounter(metrics, 'foo', { timeGranularity: 'year' });
+
+      const start = moment.utc({ year: 2014 });
+      const end = moment.utc({ year: 2015 });
+      const expected = [{ two: 6 }, { one: 3 }];
+
+      const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
+
+      Promise.all([
+        counter.incr('one'),
+        counter.incr('two'),
+        counter.incr('two')
+      ])
+      .then(() => {
+        clock.tick(1000 * 60 * 60 * 24 * 365);
+        return Promise.all([
+          counter.incr('one'),
+          counter.incr('one'),
+          counter.incr('two'),
+          counter.incr('two'),
+          counter.incr('two'),
+          counter.incr('two')
+        ]);
+      })
+      .then(() => {
+        clock.tick(1000 * 60 * 60 * 24 * 365);
+        return Promise.all([
+          counter.incr('one'),
+          counter.incr('two')
+        ]);
+      })
+      .then(() => counter.topRange(start, end, 'total'))
+      .then(result => {
+        // Check promise
+        expect(result).to.deep.equal(expected);
+
+        // Check callback
+        counter.topRange(start, end, 'total', (err, res) => {
+          expect(res).to.deep.equal(expected);
+          done();
+        });
+      })
+      .catch(done);
+    });
+
+    it('can be customized with direction, startingAt and limit', done => {
+      const counter = new TimestampedCounter(metrics, 'foo', { timeGranularity: 'year' });
+
+      const start = moment.utc({ year: 2014 });
+      const end = moment.utc({ year: 2015 });
+      const expected = {};
+      expected[start.format()] = [{ two: 2 }, { three: 3 }];
+      expected[end.format()] = [{ two: 4 }, { three: 6 }];
+
+      const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
+
+      Promise.all([
+        counter.incr('one'),
+        counter.incr('two'),
+        counter.incr('two'),
+        counter.incr('three'),
+        counter.incr('three'),
+        counter.incr('three'),
+        counter.incr('four'),
+        counter.incr('four'),
+        counter.incr('four'),
+        counter.incr('four')
+      ])
+      .then(() => {
+        clock.tick(1000 * 60 * 60 * 24 * 365);
+        return Promise.all([
+          counter.incr('one'),
+          counter.incr('one'),
+          counter.incr('two'),
+          counter.incr('two'),
+          counter.incr('two'),
+          counter.incr('two'),
+          counter.incr('three'),
+          counter.incr('three'),
+          counter.incr('three'),
+          counter.incr('three'),
+          counter.incr('three'),
+          counter.incr('three'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four')
+        ]);
+      })
+      .then(() => counter.topRange(start, end, 'year', 'asc', 1, 2))
+      .then(result => {
+        // Check promise
+        expect(result).to.deep.equal(expected);
+
+        // Check callback
+        counter.topRange(start, end, 'year', 'asc', 1, 2, (err, res) => {
+          expect(res).to.deep.equal(expected);
+          done();
+        });
+      })
+      .catch(done);
+    });
+
+    it('can be customized with direction, startingAt and limit, on "total" granularity', done => {
+      const counter = new TimestampedCounter(metrics, 'foo', { timeGranularity: 'year' });
+
+      const start = moment.utc({ year: 2014 });
+      const end = moment.utc({ year: 2015 });
+      const expected = [{ two: 7 }, { three: 8 }];
+
+      const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
+
+      // orders are inverted in this first call to make sure that results
+      // are not trimmed in the initial zscore calls
+      Promise.all([
+        counter.incr('one'),
+        counter.incr('one'),
+        counter.incr('one'),
+        counter.incr('one'),
+        counter.incr('two'),
+        counter.incr('two'),
+        counter.incr('two'),
+        counter.incr('three'),
+        counter.incr('three'),
+        counter.incr('four')
+      ])
+      .then(() => {
+        clock.tick(1000 * 60 * 60 * 24 * 365);
+        return Promise.all([
+          counter.incr('one'),
+          counter.incr('one'),
+          counter.incr('two'),
+          counter.incr('two'),
+          counter.incr('two'),
+          counter.incr('two'),
+          counter.incr('three'),
+          counter.incr('three'),
+          counter.incr('three'),
+          counter.incr('three'),
+          counter.incr('three'),
+          counter.incr('three'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four'),
+          counter.incr('four')
+        ]);
+      })
+      .then(() => {
+        clock.tick(1000 * 60 * 60 * 24 * 365);
+        return Promise.all([
+          counter.incr('one'),
+          counter.incr('two')
+        ]);
+      })
+      .then(() => counter.topRange(start, end, 'total', 'asc', 1, 2))
+      .then(result => {
+        // Check promise
+        expect(result).to.deep.equal(expected);
+
+        // Check callback
+        counter.topRange(start, end, 'total', 'asc', 1, 2, (err, res) => {
+          expect(res).to.deep.equal(expected);
+          done();
+        });
+      })
+      .catch(done);
+    });
+
+    it('should throw an exc if no from date is given', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'total'
+      });
+
+      const throwClosure = () => counter.topRange();
+      expect(throwClosure).to.throw(Error);
+    });
+
+    it('should throw an exc if an unsupported direction is given', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        timeGranularity: 'total'
+      });
+
+      const throwClosure = () => counter.topRange(new Date(), new Date(), 'total', 1);
+      expect(throwClosure).to.throw(Error);
     });
   });
 
