@@ -5,7 +5,7 @@
   "main": "lib/metrics.js",
   "scripts": {
     "exectests": "node_modules/.bin/nyc ./node_modules/.bin/_mocha --exit",
-    "codecov": "node_modules/.bin/nyc ./node_modules/.bin/_mocha --exit --report lcovonly -- -R spec && codecov",
+    "codecov": "node_modules/.bin/nyc ./node_modules/.bin/_mocha --exit && node_modules/.bin/nyc report --reporter=text-lcov > coverage.lcov && ./node_modules/.bin/codecov",
     "lint": "node_modules/.bin/eslint lib test --quiet",
     "test": "npm run exectests && npm run lint",
     "testci": "npm run lint && npm run codecov",
@@ -27,7 +27,7 @@
   "author": "Conversio <dev@conversio.com> (https://conversio.com)",
   "license": "MIT",
   "dependencies": {
-    "lodash": "^3.10.0",
+    "lodash": "^4.17.10",
     "moment": "^2.22.2",
     "redis": "^2.5.3"
   },
