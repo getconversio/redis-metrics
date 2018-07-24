@@ -1,14 +1,12 @@
 {
   "name": "redis-metrics",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "description": "Easy metric tracking and aggregation using Redis",
   "main": "lib/metrics.js",
   "scripts": {
-    "exectests": "node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha",
-    "codecov": "node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha --report lcovonly -- -R spec && codecov",
-    "jshint": "node_modules/.bin/jshint lib test",
-    "jscs": "node_modules/.bin/jscs lib test",
-    "lint": "npm run jshint && npm run jscs",
+    "exectests": "node_modules/.bin/nyc ./node_modules/.bin/_mocha --exit",
+    "codecov": "node_modules/.bin/nyc ./node_modules/.bin/_mocha --exit --report lcovonly -- -R spec && codecov",
+    "lint": "node_modules/.bin/eslint lib test --quiet",
     "test": "npm run exectests && npm run lint",
     "testci": "npm run lint && npm run codecov",
     "docs": "node_modules/.bin/jsdoc -c jsdoc.json"
@@ -30,18 +28,19 @@
   "license": "MIT",
   "dependencies": {
     "lodash": "^3.10.0",
-    "moment": "^2.11.1",
+    "moment": "^2.22.2",
     "redis": "^2.5.3"
   },
   "devDependencies": {
     "async": "^0.9.0",
     "chai": "^4.1.1",
+    "eslint": "^5.2.0",
+    "eslint-config-conversio": "^2.2.0",
+    "eslint-plugin-mocha": "^5.1.0",
     "ioredis": "^2.5.0",
-    "istanbul": "^0.3.13",
-    "jscs": "^2.11.0",
     "jsdoc": "^3.4.3",
-    "jshint": "^2.7.0",
-    "mocha": "^3.5.0",
-    "sinon": "^1.14.1"
+    "mocha": "^5.2.0",
+    "nyc": "^12.0.2",
+    "sinon": "^6.1.4"
   }
 }

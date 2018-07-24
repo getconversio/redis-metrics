@@ -1,6 +1,6 @@
 'use strict';
 
-const chai = require('chai'),
+const { expect } = require('chai'),
   sinon = require('sinon'),
   moment = require('moment'),
   IORedis = require('ioredis'),
@@ -9,24 +9,19 @@ const chai = require('chai'),
   constants = require('../lib/constants'),
   utils = require('../lib/utils');
 
-const expect = chai.expect;
-
 describe('Counter', () => {
   let metrics;
   let sandbox;
 
   beforeEach(done => {
-    sandbox = sinon.sandbox.create();
+    sandbox = sinon.createSandbox();
     const host = process.env.REDIS_HOST || 'localhost';
     const port = process.env.REDIS_PORT || 6379;
     if (process.env.USE_IOREDIS) {
       const client = new IORedis(port, host);
-      metrics = new RedisMetrics({ client: client });
+      metrics = new RedisMetrics({ client });
     } else {
-      metrics = new RedisMetrics({
-        host: host,
-        port: port
-      });
+      metrics = new RedisMetrics({ host, port });
     }
     metrics.client.flushall(done);
   });
@@ -418,7 +413,7 @@ describe('Counter', () => {
       });
 
       return counter.incr('bar').then(result => {
-        expect(parseInt(result)).to.equal(1);
+        expect(Number(result)).to.equal(1);
       });
     });
 
@@ -430,7 +425,7 @@ describe('Counter', () => {
       );
 
       return counter.incr('bar').then(result => {
-        expect(parseInt(result)).to.equal(1);
+        expect(Number(result)).to.equal(1);
       });
     });
 
@@ -617,7 +612,7 @@ describe('Counter', () => {
       const counter = new TimestampedCounter(metrics, 'foo');
 
       counter.incrby(9, 'bar').then(result => {
-        expect(parseInt(result)).to.equal(9);
+        expect(Number(result)).to.equal(9);
         done();
       })
       .catch(done);
@@ -1141,7 +1136,6 @@ describe('Counter', () => {
             counter.incr().then(() => {
               metrics.client.ttl(key, (err2, ttl2) => {
                 // Expect that ttl has decreased.
-                console.log(ttl, ttl2);
                 expect(ttl2).to.be.below(ttl);
                 expect(ttl2).to.be.within(ttl - 2, ttl);
                 done();
@@ -1168,7 +1162,6 @@ describe('Counter', () => {
             counter.incr('bar').then(() => {
               metrics.client.ttl(key, (err2, ttl2) => {
                 // Expect that ttl has decreased.
-                console.log(ttl, ttl2);
                 expect(ttl2).to.be.below(ttl);
                 expect(ttl2).to.be.within(ttl - 2, ttl);
                 done();
@@ -1574,7 +1567,7 @@ describe('Counter', () => {
         counter.incrby(8, 'oranges'),
         counter.incrby(7, 'pears'),
         counter.incrby(5, 'peaches'),
-        counter.incrby(2, 'mangos'),
+        counter.incrby(2, 'mangos')
       ]);
     });
 

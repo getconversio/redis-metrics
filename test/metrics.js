@@ -2,17 +2,15 @@
 
 const redis = require('redis'),
   sinon = require('sinon'),
-  chai = require('chai'),
+  { expect } = require('chai'),
   RedisMetrics = require('../lib/metrics'),
   TimestampedCounter = require('../lib/counter');
 
-const expect = chai.expect;
-
 describe('Metric main', () => {
-
   let sandbox;
+
   beforeEach(() => {
-    sandbox = sinon.sandbox.create();
+    sandbox = sinon.createSandbox();
   });
 
   afterEach(() => {
@@ -30,6 +28,8 @@ describe('Metric main', () => {
         .expects('createClient')
         .once()
         .withExactArgs();
+
+      // eslint-disable-next-line no-new
       new RedisMetrics();
       mock.verify();
     });
@@ -39,19 +39,22 @@ describe('Metric main', () => {
         .expects('createClient')
         .once()
         .withExactArgs(1234, 'abcd', {});
+
+      // eslint-disable-next-line no-new
       new RedisMetrics({ host: 'abcd', port: 1234 });
       mock.verify();
     });
 
     it('should create a redis client with options if provided', () => {
-      // jscs:disable requireCamelCaseOrUpperCaseIdentifiers
-      const redisOpts = { no_ready_check: true };
+      const redisOptions = { no_ready_check: true };
 
       const mock = sandbox.mock(redis)
         .expects('createClient')
         .once()
-        .withExactArgs(redisOpts);
-      new RedisMetrics({ redisOptions: redisOpts });
+        .withExactArgs(redisOptions);
+
+      // eslint-disable-next-line no-new
+      new RedisMetrics({ redisOptions });
       mock.verify();
     });
 
@@ -62,7 +65,8 @@ describe('Metric main', () => {
         .expects('createClient')
         .never();
 
-      new RedisMetrics({ client: client });
+      // eslint-disable-next-line no-new
+      new RedisMetrics({ client });
       mock.verify();
     });
   });
@@ -95,5 +99,4 @@ describe('Metric main', () => {
       expect(counter.options.timeGranularity).to.equal(2);
     });
   });
-
 });
