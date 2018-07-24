@@ -5,7 +5,7 @@
   "main": "lib/metrics.js",
   "scripts": {
     "exectests": "node_modules/.bin/nyc ./node_modules/.bin/_mocha --exit",
-    "codecov": "node_modules/.bin/nyc ./node_modules/.bin/_mocha --exit && node_modules/.bin/nyc report --reporter=text-lcov > coverage.lcov && ./node_modules/.bin/codecov",
+    "codecov": "node_modules/.bin/nyc ./node_modules/.bin/_mocha --exit && node_modules/.bin/nyc report --reporter=text-lcov > coverage.lcov && codecov",
     "lint": "node_modules/.bin/eslint lib test --quiet",
     "test": "npm run exectests && npm run lint",
     "testci": "npm run lint && npm run codecov",
