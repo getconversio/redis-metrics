@@ -1,32 +1,28 @@
 'use strict';
 
-const chai = require('chai'),
+const { expect } = require('chai'),
   sinon = require('sinon'),
   moment = require('moment'),
   IORedis = require('ioredis'),
+  { ensureError } = require('./utils'),
   RedisMetrics = require('../lib/metrics'),
   TimestampedCounter = require('../lib/counter'),
   constants = require('../lib/constants'),
   utils = require('../lib/utils');
-
-const expect = chai.expect;
 
 describe('Counter', () => {
   let metrics;
   let sandbox;
 
   beforeEach(done => {
-    sandbox = sinon.sandbox.create();
+    sandbox = sinon.createSandbox();
     const host = process.env.REDIS_HOST || 'localhost';
     const port = process.env.REDIS_PORT || 6379;
     if (process.env.USE_IOREDIS) {
       const client = new IORedis(port, host);
-      metrics = new RedisMetrics({ client: client });
+      metrics = new RedisMetrics({ client });
     } else {
-      metrics = new RedisMetrics({
-        host: host,
-        port: port
-      });
+      metrics = new RedisMetrics({ host, port });
     }
     metrics.client.flushall(done);
   });
@@ -328,25 +324,15 @@ describe('Counter', () => {
       });
     });
 
-    it('should call the callback on success', done => {
+    it('should resolve a promise on success', () => {
       const counter = new TimestampedCounter(metrics, 'foo');
-      counter.incr((err, result) => {
-        expect(err).to.equal(null);
+
+      return counter.incr().then(result => {
         expect(result).to.equal(1);
-        done();
       });
     });
 
-    it('should resolve a promise on success', done => {
-      const counter = new TimestampedCounter(metrics, 'foo');
-      counter.incr().then(result => {
-        expect(result).to.equal(1);
-        done();
-      })
-      .catch(done);
-    });
-
-    it('should call the callback on error', done => {
+    it('should reject on error', () => {
       sandbox.stub(metrics.client, 'incrby')
         .yields(new Error('oh no'), null);
 
@@ -355,56 +341,33 @@ describe('Counter', () => {
         'foo',
         { expireKeys: false }
       );
-      counter.incr((err, result) => {
-        expect(err).to.not.equal(null);
-        expect(result).to.equal(null);
-        done();
-      });
+
+      return ensureError(() => counter.incr());
     });
 
-    it('should reject the promise on error', done => {
-      sandbox.stub(metrics.client, 'incrby')
-        .yields(new Error('oh no'), null);
-
-      const counter = new TimestampedCounter(
-        metrics,
-        'foo',
-        { expireKeys: false }
-      );
-      counter.incr().then(() => {
-        done(new Error('Should not be here'));
-      })
-      .catch(err => {
-        expect(err).to.not.equal(null);
-        done();
-      });
-    });
-
-    it('should return a list of results', done => {
+    it('should return a list of results', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
-      counter.incr().then(results => {
-        expect(results).to.be.instanceof(Array);
-        expect(results).to.deep.equal([1, 1]);
-        done();
-      })
-      .catch(done);
+      return counter.incr()
+        .then(results => {
+          expect(results).to.be.instanceof(Array);
+          expect(results).to.deep.equal([1, 1]);
+        });
     });
 
-    it('should return a list of results for non-expiring keys', done => {
+    it('should return a list of results for non-expiring keys', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year',
         expireKeys: false
       });
 
-      counter.incr().then(results => {
-        expect(results).to.be.instanceof(Array);
-        expect(results).to.deep.equal([1, 1]);
-        done();
-      })
-      .catch(done);
+      return counter.incr()
+        .then(results => {
+          expect(results).to.be.instanceof(Array);
+          expect(results).to.deep.equal([1, 1]);
+        });
     });
   });
 
@@ -417,8 +380,8 @@ describe('Counter', () => {
         }
       });
 
-      return counter.incr('bar').then(result => {
-        expect(parseInt(result)).to.equal(1);
+      return counter.incr({ eventObj: 'bar' }).then(result => {
+        expect(Number(result)).to.equal(1);
       });
     });
 
@@ -429,8 +392,8 @@ describe('Counter', () => {
         { expireKeys: false }
       );
 
-      return counter.incr('bar').then(result => {
-        expect(parseInt(result)).to.equal(1);
+      return counter.incr({ eventObj: 'bar' }).then(result => {
+        expect(Number(result)).to.equal(1);
       });
     });
 
@@ -443,7 +406,7 @@ describe('Counter', () => {
         }
       });
 
-      return counter.incr('bar').then(results => {
+      return counter.incr({ eventObj: 'bar' }).then(results => {
         expect(utils.parseIntArray(results)).to.deep.equal([1, 1]);
       });
     });
@@ -454,14 +417,114 @@ describe('Counter', () => {
         expireKeys: false
       });
 
-      return counter.incr('bar').then(results => {
+      return counter.incr({ eventObj: 'bar' }).then(results => {
         expect(utils.parseIntArray(results)).to.deep.equal([1, 1]);
       });
     });
   });
 
+  describe('incr with expiration', () => {
+    it('should set a ttl for a key', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 100
+        }
+      });
+
+      return counter.incr()
+        .then(() => {
+          const [key] = counter.getKeys();
+          return utils.ninvoke(metrics.client, 'ttl', key);
+        })
+        .then(ttl => {
+          expect(ttl).to.be.above(0);
+          expect(ttl).to.be.most(100);
+        });
+    });
+
+    it('should set a ttl for a key with event objects', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 100
+        }
+      });
+
+      return counter.incr({ eventObj: 'bar' })
+        .then(() => {
+          const key = counter.getKeys()[0] + ':z';
+          return utils.ninvoke(metrics.client, 'ttl', key);
+        })
+        .then(ttl => {
+          expect(ttl).to.be.above(0);
+          expect(ttl).to.be.most(100);
+        });
+    });
+
+    it('should not renew the ttl on the second call', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 100
+        }
+      });
+
+      let key;
+
+      return counter.incr()
+        .then(() => {
+          [key] = counter.getKeys();
+          return utils.ninvoke(metrics.client, 'ttl', key);
+        })
+        .then(ttl => new Promise((resolve, reject) => {
+          setTimeout(() => {
+            counter.incr()
+              .then(() => utils.ninvoke(metrics.client, 'ttl', key))
+              .then(ttl2 => {
+                // Expect that ttl has decreased.
+                expect(ttl2).to.be.below(ttl);
+                expect(ttl2).to.be.within(ttl - 2, ttl);
+                resolve();
+              })
+              .catch(reject);
+          }, 1100);
+        }));
+    });
+
+    it('should not renew the ttl on the second call for eventObj', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 100
+        }
+      });
+
+      let key;
+
+      return counter.incr({ eventObj: 'bar' })
+        .then(() => {
+          key = counter.getKeys()[0] + ':z';
+          return utils.ninvoke(metrics.client, 'ttl', key);
+        })
+        .then(ttl => new Promise((resolve, reject) => {
+          setTimeout(() => {
+            counter.incr({ eventObj: 'bar' })
+              .then(() => utils.ninvoke(metrics.client, 'ttl', key))
+              .then(ttl2 => {
+                // Expect that ttl has decreased.
+                expect(ttl2).to.be.below(ttl);
+                expect(ttl2).to.be.within(ttl - 2, ttl);
+                resolve();
+              })
+              .catch(reject);
+          }, 1100);
+        }));
+    });
+  });
+
   describe('incrby', () => {
-    it('should call redis without a tran when keys do not exp', done => {
+    it('should call redis without a tran when keys do not exp', () => {
       const multiSpy = sandbox.spy(metrics.client, 'multi');
       const incrSpy = sandbox.spy(metrics.client, 'incrby');
 
@@ -470,15 +533,14 @@ describe('Counter', () => {
         'foo',
         { expireKeys: false }
       );
-      counter.incrby(2).then(() => {
+
+      return counter.incrby(2).then(() => {
         sinon.assert.calledOnce(incrSpy);
         sinon.assert.notCalled(multiSpy);
-        done();
-      })
-      .catch(done);
+      });
     });
 
-    it('should call redis without a trans when counters exp', done => {
+    it('should call redis without a trans when counters exp', () => {
       const multiSpy = sandbox.spy(metrics.client, 'multi');
       const evalSpy = sandbox.spy(metrics.client, 'eval');
 
@@ -488,47 +550,34 @@ describe('Counter', () => {
           total: 10
         }
       });
-      counter.incrby(2).then(() => {
+
+      return counter.incrby(2).then(() => {
         sinon.assert.calledOnce(evalSpy);
         sinon.assert.notCalled(multiSpy);
-        done();
-      })
-      .catch(done);
+      });
     });
 
-    it('should call redis when a time granularity is chosen', done => {
+    it('should call redis when a time granularity is chosen', () => {
       const multiSpy = sandbox.spy(metrics.client, 'multi');
 
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
-      counter.incrby(3).then(() => {
+      return counter.incrby(3).then(() => {
         sinon.assert.calledOnce(multiSpy);
-        done();
-      })
-      .catch(done);
-    });
-
-    it('should call the callback on success', done => {
-      const counter = new TimestampedCounter(metrics, 'foo');
-      counter.incrby(4, (err, result) => {
-        expect(err).to.equal(null);
-        expect(result).to.equal(4);
-        done();
       });
     });
 
-    it('should resolve a promise on success', done => {
+    it('should resolve on success', () => {
       const counter = new TimestampedCounter(metrics, 'foo');
-      counter.incrby(5).then(result => {
+
+      return counter.incrby(5).then(result => {
         expect(result).to.equal(5);
-        done();
-      })
-      .catch(done);
+      });
     });
 
-    it('should call the callback on error from incrby', done => {
+    it('should reject the promise on redis error from incrby', () => {
       sandbox.stub(metrics.client, 'incrby')
         .yields(new Error('oh no'), null);
 
@@ -537,14 +586,11 @@ describe('Counter', () => {
         'foo',
         { expireKeys: false }
       );
-      counter.incrby(6, (err, result) => {
-        expect(err).to.not.equal(null);
-        expect(result).to.equal(null);
-        done();
-      });
+
+      return ensureError(() => counter.incrby(7));
     });
 
-    it('should call the callback on error from eval', done => {
+    it('should reject the promise on redis error with eval', () => {
       sandbox.stub(metrics.client, 'eval')
         .yields(new Error('oh no'), null);
 
@@ -554,183 +600,122 @@ describe('Counter', () => {
           total: 10
         }
       });
-      counter.incrby(6, (err, result) => {
-        expect(err).to.not.equal(null);
-        expect(result).to.equal(null);
-        done();
-      });
+
+      return ensureError(() => counter.incrby(7));
     });
 
-    it('should reject the promise on redis error from incrby', done => {
-      sandbox.stub(metrics.client, 'incrby')
-        .yields(new Error('oh no'), null);
-
-      const counter = new TimestampedCounter(
-        metrics,
-        'foo',
-        { expireKeys: false }
-      );
-      counter.incrby(7).then(() => {
-        done(new Error('Should not be here'));
-      })
-      .catch(err => {
-        expect(err).to.not.equal(null);
-        done();
-      });
-    });
-
-    it('should reject the promise on redis error with eval', done => {
-      sandbox.stub(metrics.client, 'eval')
-        .yields(new Error('oh no'), null);
-
-      const counter = new TimestampedCounter(metrics, 'foo', {
-        expireKeys: true,
-        expiration: {
-          total: 10
-        }
-      });
-      counter.incrby(7).then(() => {
-        done(new Error('Should not be here'));
-      })
-      .catch(err => {
-        expect(err).to.not.equal(null);
-        done();
-      });
-    });
-
-    it('should return a list of results from the operation', done => {
+    it('should resolve a list of results from the operation', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
-      counter.incrby(8).then(results => {
+      return counter.incrby(8).then(results => {
         expect(results).to.be.instanceof(Array);
         expect(results).to.deep.equal([8, 8]);
-        done();
-      })
-      .catch(done);
+      });
     });
   });
 
   describe('incrby with event object', () => {
-    it('should work with an event object', done => {
+    it('should work with an event object', () => {
       const counter = new TimestampedCounter(metrics, 'foo');
 
-      counter.incrby(9, 'bar').then(result => {
-        expect(parseInt(result)).to.equal(9);
-        done();
-      })
-      .catch(done);
+      return counter.incrby(9, { eventObj: 'bar' }).then(result => {
+        expect(Number(result)).to.equal(9);
+      });
     });
 
-    it('should work with an event object and time granularity', done => {
+    it('should work with an event object and time granularity', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
-      counter.incrby(10, 'bar').then(results => {
+      return counter.incrby(10, { eventObj: 'bar' }).then(results => {
         expect(utils.parseIntArray(results)).to.deep.equal([10, 10]);
-        done();
-      })
-      .catch(done);
+      });
+    });
+  });
+
+  describe('incrby with expiration', () => {
+    it('should set a ttl for a key', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 60 // Gone in 60 seconds :-)
+        }
+      });
+
+      return counter.incrby(10)
+        .then(() => {
+          const [key] = counter.getKeys();
+          return utils.ninvoke(metrics.client, 'ttl', key);
+        })
+        .then(ttl => {
+          expect(ttl).to.be.above(0);
+          expect(ttl).to.be.most(60);
+        });
+    });
+
+    it('should set a ttl for a key with event objects', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', {
+        expireKeys: true,
+        expiration: {
+          total: 100
+        }
+      });
+
+      return counter.incrby(10, { eventObj: 'bar' })
+        .then(() => {
+          const key = counter.getKeys()[0] + ':z';
+          return utils.ninvoke(metrics.client, 'ttl', key);
+        })
+        .then(ttl => {
+          expect(ttl).to.be.above(0);
+          expect(ttl).to.be.most(100);
+        });
     });
   });
 
   describe('count', () => {
-    it('should work with callback', done => {
-      const mock = sandbox.mock(metrics.client)
-        .expects('get')
-        .once()
-        .yields(null, '10');
-
-      const counter = new TimestampedCounter(metrics, 'foo');
-      counter.count((err, result) => {
-        mock.verify();
-        expect(result).to.equal(10);
-        done(err);
-      });
-    });
-
-    it('should work with time granularity and callback', done => {
-      const mock = sandbox.mock(metrics.client)
-        .expects('get')
-        .once()
-        .yields(null, '10');
-
-      const counter = new TimestampedCounter(metrics, 'foo');
-      counter.count('none', (err, result) => {
-        mock.verify();
-        expect(result).to.equal(10);
-        done(err);
-      });
-    });
-
-    it('should work with time gran, event object and callback', done => {
-      const mock = sandbox.mock(metrics.client)
-        .expects('zscore')
-        .once()
-        .yields(null, '10');
-
-      const counter = new TimestampedCounter(metrics, 'foo');
-      counter.count('none', 'bar', (err, result) => {
-        mock.verify();
-        expect(result).to.equal(10);
-        done(err);
-      });
-    });
-
     it('should return a single res when no arg are given', () => {
       const counter = new TimestampedCounter(metrics, 'foo');
-      return counter.incr()
-        .then(() => counter.incr())
-        .then(() => counter.incr())
-        .then(() => counter.count())
-        .then(result => {
-          // Counter has been incremented 3 times.
-          expect(result).to.equal(3);
-        });
+      return Promise.all([
+        counter.incr(),
+        counter.incr(),
+        counter.incr()
+      ])
+      .then(() => counter.count())
+      .then(result => {
+        expect(result).to.equal(3);
+      });
     });
 
     it('should return a single result for an event object', () => {
       const counter = new TimestampedCounter(metrics, 'foo');
-      return counter.incr('bar')
-        .then(() => counter.incr('bar'))
-        .then(() => counter.incr('bar'))
-        .then(() => counter.count('total', 'bar'))
-        .then(result => {
-          // Counter has been incremented 3 times.
-          expect(result).to.equal(3);
-        });
-    });
-
-    it('should return 0 when the key does not exist (cb)', done => {
-      const mock = sandbox.mock(metrics.client)
-        .expects('get')
-        .once()
-        .yields(null, null);
-
-      const counter = new TimestampedCounter(metrics, 'foo');
-      counter.count((err, result) => {
-        mock.verify();
-        expect(result).to.equal(0);
-        done(err);
+      return Promise.all([
+        counter.incr({ eventObj: 'bar' }),
+        counter.incr({ eventObj: 'bar' }),
+        counter.incr({ eventObj: 'bar' })
+      ])
+      .then(() => counter.count({ eventObj: 'bar' }))
+      .then(result => {
+        expect(result).to.equal(3);
       });
     });
 
-    it('should return 0 when the key does not exist (promise)', done => {
+    it('should return 0 when the key does not exist', () => {
       const mock = sandbox.mock(metrics.client)
         .expects('get')
         .once()
         .yields(null, null);
 
       const counter = new TimestampedCounter(metrics, 'foo');
-      counter.count()
+
+      return counter.count()
         .then(result => {
           mock.verify();
           expect(result).to.equal(0);
-          done();
-        })
-        .catch(done);
+        });
     });
 
     it('should return a count for a specific time granularity', () => {
@@ -747,15 +732,15 @@ describe('Counter', () => {
           clock.tick(1000 * 60 * 60 * 24 * 365);
           return counter.incr();
         })
-        .then(() => counter.count('none')) // same as counter.count();
+        .then(() => counter.count()) // same as counter.count();
         .then(result => {
           expect(result).to.equal(2);
-          return counter.count('year');
+          return counter.count({ timeGranularity: 'year' });
         })
         .then(result => expect(result).to.equal(1));
     });
 
-    it('should return a count for a specific time gran and event', () => {
+    it('should return a count for a specific granularity and event', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
@@ -764,502 +749,277 @@ describe('Counter', () => {
       // Total should be 2 but year should be 1.
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
-      return counter.incr('bar')
+      return counter.incr({ eventObj: 'bar' })
         .then(() => {
           clock.tick(1000 * 60 * 60 * 24 * 365);
-          return counter.incr('bar');
+          return counter.incr({ eventObj: 'bar' });
         })
-        .then(() => counter.count('none', 'bar'))
+        .then(() => counter.count({ eventObj: 'bar' }))
         .then(result => {
           expect(result).to.equal(2);
-          return counter.count('year', 'bar');
+          return counter.count({ timeGranularity: 'year', eventObj: 'bar' });
         })
         .then(result => expect(result).to.equal(1));
     });
   });
 
   describe('countRange', () => {
-    it('should return a range of counts', done => {
+    it('should return a range of counts', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
       // Increment 2014 once and 2015 twice
-
-      const start = moment.utc({ year: 2014 });
-      const end = moment.utc({ year: 2015 });
-      const expected = {};
-      expected[start.format()] = 1;
-      expected[end.format()] = 2;
+      const startDate = moment.utc({ year: 2014 });
+      const endDate = moment.utc({ year: 2015 });
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
-      counter.incr()
+      return counter.incr()
         .then(() => {
           clock.tick(1000 * 60 * 60 * 24 * 365);
-          return counter.incr();
+          return Promise.all([
+            counter.incr(),
+            counter.incr()
+          ]);
         })
-        .then(() => counter.incr())
-        .then(() => counter.countRange('year', start, end))
+        .then(() => counter.countRange('year', { startDate, endDate }))
         .then(result => {
-          // Check promise
-          expect(result).to.deep.equal(expected);
-
-          // Check callback
-          counter.countRange('year', start, end, (err, res) => {
-            expect(res).to.deep.equal(expected);
-            done();
+          expect(result).to.deep.equal({
+            [startDate.format()]: 1,
+            [endDate.format()]: 2
           });
-        })
-        .catch(done);
+        });
     });
 
-    it('should return a range of counts at the second level', done => {
+    it('should return a range of counts at the second level', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'second'
       });
 
-      const start = moment.utc({ year: 2015, second: 0 });
-      const end = moment.utc({ year: 2015, second: 1 });
-      const expected = {};
-      expected[start.format()] = 1;
-      expected[end.format()] = 2;
+      const startDate = moment.utc({ year: 2015, second: 0 });
+      const endDate = moment.utc({ year: 2015, second: 1 });
 
       const clock = sandbox.useFakeTimers(new Date('2015-01-01').getTime());
-      counter.incr()
+      return counter.incr()
         .then(() => {
           clock.tick(1000);
-          return counter.incr();
+          return Promise.all([
+            counter.incr(),
+            counter.incr()
+          ]);
         })
-        .then(() => counter.incr())
-        .then(() => counter.countRange('second', start, end))
+        .then(() => counter.countRange('second', { startDate, endDate }))
         .then(result => {
-          // Check promise
-          expect(result).to.deep.equal(expected);
-
-          // Check callback
-          counter.countRange('second', start, end, (err, res) => {
-            expect(res).to.deep.equal(expected);
-            done();
+          expect(result).to.deep.equal({
+            [startDate.format()]: 1,
+            [endDate.format()]: 2
           });
-        })
-        .catch(done);
+        });
     });
 
-    it('should return a range of count for an event object', done => {
+    it('should return a range of count for an event object', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
-      // Increment 2014 once and 2015 twice
-
-      const start = moment.utc({ year: 2014 });
-      const end = moment.utc({ year: 2015 });
-      const expected = {};
-      expected[start.format()] = 1;
-      expected[end.format()] = 2;
+      const startDate = moment.utc({ year: 2014 });
+      const endDate = moment.utc({ year: 2015 });
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
-      counter.incr('bar')
+      return counter.incr({ eventObj: 'bar' })
         .then(() => {
           clock.tick(1000 * 60 * 60 * 24 * 365);
-          return counter.incr('bar');
+          return Promise.all([
+            counter.incr({ eventObj: 'bar' }),
+            counter.incr({ eventObj: 'bar' })
+          ]);
         })
-        .then(() => counter.incr('bar'))
-        .then(() => counter.countRange('year', start, end, 'bar'))
+        .then(() => counter.countRange('year', { startDate, endDate }, { eventObj: 'bar' }))
         .then(result => {
-          // Check promise
-          expect(result).to.deep.equal(expected);
-
-          // Check callback
-          counter.countRange('year', start, end, 'bar', (err, res) => {
-            expect(res).to.deep.equal(expected);
-            done();
+          expect(result).to.deep.equal({
+            [startDate.format()]: 1,
+            [endDate.format()]: 2
           });
-        })
-        .catch(done);
+        });
     });
 
-    it('should use current date if no end date is provided', done => {
+    it('should use current date if no end date is provided', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
-      // Increment 2014 once and 2015 twice
-
-      const start = moment.utc({ year: 2014 });
-      const expected = {};
-      expected[start.format()] = 1;
-      expected[moment.utc(start).add(1, 'years').format()] = 2;
+      const startDate = moment.utc({ year: 2014 });
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
-      counter.incr()
+      return counter.incr()
         .then(() => {
           clock.tick(1000 * 60 * 60 * 24 * 365);
-          return counter.incr();
+          return Promise.all([
+            counter.incr(),
+            counter.incr()
+          ]);
         })
-        .then(() => counter.incr())
-        .then(() => counter.countRange('year', start))
+        .then(() => counter.countRange('year', { startDate }))
         .then(result => {
-          // Check promise
-          expect(result).to.deep.equal(expected);
-
-          // Check callback
-          counter.countRange('year', start, (err, res) => {
-            expect(res).to.deep.equal(expected);
-            done();
+          expect(result).to.deep.equal({
+            [startDate.format()]: 1,
+            [moment.utc(startDate).add(1, 'years').format()]: 2
           });
-        })
-        .catch(done);
+        });
     });
 
-    it('should return 0 for counters where no data registed', done => {
+    it('should return 0 for counters where no data registed', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
       // Increment 2014 once.
-
-      const start = moment.utc({ year: 2014 });
-      const end = moment.utc({ year: 2015 });
-      const expected = {};
-      expected[start.format()] = 1;
-      expected[end.format()] = 0;
+      const startDate = moment.utc({ year: 2014 });
+      const endDate = moment.utc({ year: 2015 });
 
       sandbox.useFakeTimers(new Date('2014-02-01').getTime());
-      counter.incr()
-        .then(() => counter.countRange('year', start, end))
+      return counter.incr()
+        .then(() => counter.countRange('year', { startDate, endDate }))
         .then(result => {
-          // Check promise
-          expect(result).to.deep.equal(expected);
-
-          // Check callback
-          counter.countRange('year', start, end, (err, res) => {
-            expect(res).to.deep.equal(expected);
-            done();
+          expect(result).to.deep.equal({
+            [startDate.format()]: 1,
+            [endDate.format()]: 0
           });
-        })
-        .catch(done);
+        });
     });
 
-    it('should return 0 for counters where no data is reg', done => {
+    it('should return 0 for eventObj counters where no data is registered', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
       // Increment 2014 once.
-
-      const start = moment.utc({ year: 2014 });
-      const end = moment.utc({ year: 2015 });
-      const expected = {};
-      expected[start.format()] = 1;
-      expected[end.format()] = 0;
+      const startDate = moment.utc({ year: 2014 });
+      const endDate = moment.utc({ year: 2015 });
 
       sandbox.useFakeTimers(new Date('2014-02-01').getTime());
-      counter.incr('bar')
-        .then(() => counter.countRange('year', start, end, 'bar'))
+      return counter.incr({ eventObj: 'bar' })
+        .then(() => counter.countRange('year', { startDate, endDate }, { eventObj: 'bar' }))
         .then(result => {
-          // Check promise
-          expect(result).to.deep.equal(expected);
-
-          // Check callback
-          counter.countRange('year', start, end, 'bar', (err, res) => {
-            expect(res).to.deep.equal(expected);
-            done();
+          expect(result).to.deep.equal({
+            [startDate.format()]: 1,
+            [endDate.format()]: 0
           });
-        })
-        .catch(done);
+        });
     });
 
-    it('should accept strings for date range', done => {
+    it('should accept strings for date range', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
-      // Increment 2014 once and 2015 twice
-
-      const start = moment.utc({ year: 2014 });
-      const end = moment.utc({ year: 2015 });
-      const expected = {};
-      expected[start.format()] = 1;
-      expected[end.format()] = 2;
+      const startDate = moment.utc({ year: 2014 });
+      const endDate = moment.utc({ year: 2015 });
 
       const startStr = '2014-01-01T00:00:00Z';
       const endStr = '2015-01-01T00:00:00Z';
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
-      counter.incr()
+      return counter.incr()
         .then(() => {
           clock.tick(1000 * 60 * 60 * 24 * 365);
-          return counter.incr();
+          return Promise.all([
+            counter.incr(),
+            counter.incr()
+          ]);
         })
-        .then(() => counter.incr())
-        .then(() => counter.countRange('year', startStr, endStr))
+        .then(() => counter.countRange('year', { startDate: startStr, endDate: endStr }))
         .then(result => {
-          // Check promise
-          expect(result).to.deep.equal(expected);
-
-          // Check callback
-          counter.countRange('year', startStr, endStr, (err, res) => {
-            expect(res).to.deep.equal(expected);
-            done();
+          expect(result).to.deep.equal({
+            [startDate.format()]: 1,
+            [endDate.format()]: 2
           });
-        })
-        .catch(done);
+        });
     });
 
-    it('should accept numbers for date range', done => {
+    it('should accept numbers for date range', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
-      // Increment 2014 once and 2015 twice
-
       const start = moment.utc({ year: 2014 });
       const end = moment.utc({ year: 2015 });
-      const expected = {};
-      expected[start.format()] = 1;
-      expected[end.format()] = 2;
 
       const startNum = start.valueOf();
       const endNum = end.valueOf();
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
-      counter.incr()
+      return counter.incr()
         .then(() => {
           clock.tick(1000 * 60 * 60 * 24 * 365);
-          return counter.incr();
+          return Promise.all([
+            counter.incr(),
+            counter.incr()
+          ]);
         })
-        .then(() => counter.incr())
-        .then(() => counter.countRange('year', startNum, endNum))
+        .then(() => counter.countRange('year', { startDate: startNum, endDate: endNum }))
         .then(result => {
-          // Check promise
-          expect(result).to.deep.equal(expected);
-
-          // Check callback
-          counter.countRange('year', startNum, endNum, (err, res) => {
-            expect(res).to.deep.equal(expected);
-            done();
+          expect(result).to.deep.equal({
+            [start.format()]: 1,
+            [end.format()]: 2
           });
-        })
-        .catch(done);
+        });
     });
 
-    it('should return a single num if "total" granularity is selected', done => {
+    it('should return a single num if "total" granularity is selected', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'year'
       });
 
       // Increment 2014 once and 2015 twice => total is 3
-
-      const start = moment.utc({ year: 2014 });
-      const end = moment.utc({ year: 2015 });
+      const startDate = moment.utc({ year: 2014 });
+      const endDate = moment.utc({ year: 2015 });
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
-      counter.incr()
+      return counter.incr()
         .then(() => {
           clock.tick(1000 * 60 * 60 * 24 * 365);
-          return counter.incr();
+          return Promise.all([
+            counter.incr(),
+            counter.incr()
+          ]);
         })
-        .then(() => counter.incr())
-        .then(() => counter.countRange('total', start, end))
+        .then(() => counter.countRange('total', { startDate, endDate }))
         .then(result => {
-          // Check promise
           expect(result).to.equal(3);
-
-          // Check callback
-          counter.countRange('total', start, end, (err, res) => {
-            expect(res).to.equal(3);
-            done();
-          });
-        })
-        .catch(done);
+        });
     });
 
-    it('should throw an exc if countRange is used on a counter', () => {
+    it('should reject if countRange is used on a counter', () => {
       const counter = new TimestampedCounter(metrics, 'foo', {
         timeGranularity: 'total'
       });
 
-      const throwClosure = () => counter.countRange('total', '2015', '2016');
-      expect(throwClosure).to.throw(Error);
-    });
-  });
-
-  describe('incr with expiration', () => {
-    it('should set a ttl for a key', done => {
-      const counter = new TimestampedCounter(metrics, 'foo', {
-        expireKeys: true,
-        expiration: {
-          total: 100
-        }
-      });
-
-      counter.incr().then(() => {
-        const key = counter.getKeys()[0];
-        metrics.client.ttl(key, (err, ttl) => {
-          expect(err).to.equal(null);
-          expect(ttl).to.be.above(0);
-          expect(ttl).to.be.most(100);
-          done();
-        });
-      })
-      .catch(done);
-    });
-
-    it('should set a ttl for a key with event objects', done => {
-      const counter = new TimestampedCounter(metrics, 'foo', {
-        expireKeys: true,
-        expiration: {
-          total: 100
-        }
-      });
-
-      counter.incr('bar').then(() => {
-        const key = counter.getKeys()[0] + ':z';
-        metrics.client.ttl(key, (err, ttl) => {
-          expect(err).to.equal(null);
-          expect(ttl).to.be.above(0);
-          expect(ttl).to.be.most(100);
-          done();
-        });
-      })
-      .catch(done);
-    });
-
-    it('should not renew the ttl on the second call', done => {
-      const counter = new TimestampedCounter(metrics, 'foo', {
-        expireKeys: true,
-        expiration: {
-          total: 100
-        }
-      });
-
-      counter.incr().then(() => {
-        const key = counter.getKeys()[0];
-        metrics.client.ttl(key, (err, ttl) => {
-          setTimeout(() => {
-            counter.incr().then(() => {
-              metrics.client.ttl(key, (err2, ttl2) => {
-                // Expect that ttl has decreased.
-                console.log(ttl, ttl2);
-                expect(ttl2).to.be.below(ttl);
-                expect(ttl2).to.be.within(ttl - 2, ttl);
-                done();
-              });
-            });
-          }, 1100);
-        });
-      })
-      .catch(done);
-    });
-
-    it('should not renew the ttl on the second call', done => {
-      const counter = new TimestampedCounter(metrics, 'foo', {
-        expireKeys: true,
-        expiration: {
-          total: 100
-        }
-      });
-
-      counter.incr('bar').then(() => {
-        const key = counter.getKeys()[0] + ':z';
-        metrics.client.ttl(key, (err, ttl) => {
-          setTimeout(() => {
-            counter.incr('bar').then(() => {
-              metrics.client.ttl(key, (err2, ttl2) => {
-                // Expect that ttl has decreased.
-                console.log(ttl, ttl2);
-                expect(ttl2).to.be.below(ttl);
-                expect(ttl2).to.be.within(ttl - 2, ttl);
-                done();
-              });
-            });
-          }, 1100);
-        });
-      })
-      .catch(done);
-    });
-  });
-
-  describe('incrby with expiration', () => {
-    it('should set a ttl for a key', done => {
-      const counter = new TimestampedCounter(metrics, 'foo', {
-        expireKeys: true,
-        expiration: {
-          total: 60 // Gone in 60 seconds :-)
-        }
-      });
-
-      counter.incrby(10).then(() => {
-        const key = counter.getKeys()[0];
-        metrics.client.ttl(key, (err, ttl) => {
-          expect(err).to.equal(null);
-          expect(ttl).to.be.above(0);
-          expect(ttl).to.be.most(60);
-          done();
-        });
-      })
-      .catch(done);
-    });
-
-    it('should set a ttl for a key with event objects', done => {
-      const counter = new TimestampedCounter(metrics, 'foo', {
-        expireKeys: true,
-        expiration: {
-          total: 100
-        }
-      });
-
-      counter.incrby(10, 'bar').then(() => {
-        const key = counter.getKeys()[0] + ':z';
-        metrics.client.ttl(key, (err, ttl) => {
-          expect(err).to.equal(null);
-          expect(ttl).to.be.above(0);
-          expect(ttl).to.be.most(100);
-          done();
-        });
-      })
-      .catch(done);
+      return ensureError(
+        () => counter.countRange('total', { startDate: '2015', endDate: '2016' }),
+        err => expect(/total granularity/.test(err.message)).to.be.true
+      );
     });
   });
 
   describe('top', () => {
-    it('should work with callback', done => {
-      const mock = sandbox.mock(metrics.client)
-        .expects('zrevrange')
-        .once()
-        .withArgs('c:foo:z', 0, -1, 'WITHSCORES')
-        .yields(null, ['foo', '39', 'bar', '13']);
-
-      const counter = new TimestampedCounter(metrics, 'foo');
-      counter.top('foo', (err, results) => {
-        mock.verify();
-        expect(results).to.have.length(2);
-        expect(results[0]).to.have.property('foo');
-        expect(results[0].foo).to.equal(39);
-        done(err);
-      });
-    });
-
-    it('should work with promises', done => {
+    it('should resolve the toplist', () => {
       const mock = sandbox.mock(metrics.client)
         .expects('zrevrange')
         .once()
         .yields(null, ['foo', '39', 'bar', '13']);
 
       const counter = new TimestampedCounter(metrics, 'foo');
-      counter.top('foo')
+      return counter.top()
         .then(results => {
           mock.verify();
           expect(results).to.have.length(2);
           expect(results[0]).to.have.property('foo');
           expect(results[0].foo).to.equal(39);
-          done();
-        })
-        .catch(done);
+        });
     });
 
-    it('should accept a startingAt argument', done => {
+    it('should accept a startingAt option', () => {
       const mock = sandbox.mock(metrics.client)
         .expects('zrevrange')
         .once()
@@ -1267,13 +1027,11 @@ describe('Counter', () => {
         .yields(null, ['foo', '39', 'bar', '13']);
 
       const counter = new TimestampedCounter(metrics, 'foo');
-      counter.top('foo', 'desc', 10, err => {
-        mock.verify();
-        done(err);
-      });
+      return counter.top({ startingAt: 10 })
+        .then(() => mock.verify());
     });
 
-    it('should accept a startingAt and a limit argument', done => {
+    it('should accept startingAt and limit options', () => {
       const mock = sandbox.mock(metrics.client)
         .expects('zrevrange')
         .once()
@@ -1281,13 +1039,11 @@ describe('Counter', () => {
         .yields(null, ['foo', '39', 'bar', '13']);
 
       const counter = new TimestampedCounter(metrics, 'foo');
-      counter.top('foo', 'desc', 10, 15, err => {
-        mock.verify();
-        done(err);
-      });
+      return counter.top({ startingAt: 10, limit: 15 })
+        .then(() => mock.verify());
     });
 
-    it('should accept a direction argument with asc value', done => {
+    it('should accept a direction option with asc value', () => {
       const mock = sandbox.mock(metrics.client)
         .expects('zrange')
         .once()
@@ -1295,28 +1051,24 @@ describe('Counter', () => {
         .yields(null, ['foo', '39', 'bar', '13']);
 
       const counter = new TimestampedCounter(metrics, 'foo');
-      counter.top('foo', 'asc', err => {
-        mock.verify();
-        done(err);
-      });
+      return counter.top({ direction: 'asc' })
+        .then(() => mock.verify());
     });
 
-    it('should throw an exception if the direction argument is not correct', done => {
+    it('should reject if the direction option is invalid', () => {
       const counter = new TimestampedCounter(metrics, 'foo');
-      try {
-        counter.top('foo', 'dummy');
-      } catch (e) {
-        return done();
-      }
 
-      throw new Error('This should never be called.');
+      return ensureError(
+        () => counter.top({ direction: 'dummy' }),
+        err => expect(err.message).to.match(/direction/)
+      );
     });
 
     it('should work with a real Redis connection', () => {
       const counter = new TimestampedCounter(metrics, 'foo');
 
-      return counter.incrby(5, '/page1')
-        .then(() => counter.incrby(3, '/page2'))
+      return counter.incrby(5, { eventObj: '/page1' })
+        .then(() => counter.incrby(3, { eventObj: '/page2' }))
         .then(() => counter.top())
         .then(results => expect(results).to.eql([
           { '/page1': 5 },
@@ -1326,292 +1078,194 @@ describe('Counter', () => {
   });
 
   describe('topRange', () => {
-    it('should return toplists within the given range', done => {
+    it('should return toplists within the given range', () => {
       const counter = new TimestampedCounter(metrics, 'foo', { timeGranularity: 'year' });
 
-      const start = moment.utc({ year: 2014 });
-      const end = moment.utc({ year: 2015 });
-      const expected = {};
-      expected[start.format()] = [{ two: 2 }, { one: 1 }];
-      expected[end.format()] = [{ two: 4 }, { one: 2 }];
+      const startDate = moment.utc({ year: 2014 });
+      const endDate = moment.utc({ year: 2015 });
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
 
-      Promise.all([
-        counter.incr('one'),
-        counter.incr('two'),
-        counter.incr('two')
+      return Promise.all([
+        counter.incr({ eventObj: 'one' }),
+        counter.incrby(2, { eventObj: 'two' })
       ])
       .then(() => {
         clock.tick(1000 * 60 * 60 * 24 * 365);
         return Promise.all([
-          counter.incr('one'),
-          counter.incr('one'),
-          counter.incr('two'),
-          counter.incr('two'),
-          counter.incr('two'),
-          counter.incr('two')
+          counter.incrby(2, { eventObj: 'one' }),
+          counter.incrby(4, { eventObj: 'two' })
         ]);
       })
-      .then(() => counter.topRange(start, end, 'year'))
+      .then(() => counter.topRange({ startDate, endDate }, { timeGranularity: 'year' }))
       .then(result => {
-        // Check promise
-        expect(result).to.deep.equal(expected);
-
-        // Check callback
-        counter.topRange(start, end, 'year', (err, res) => {
-          expect(res).to.deep.equal(expected);
-          done();
+        expect(result).to.deep.equal({
+          [startDate.format()]: [{ two: 2 }, { one: 1 }],
+          [endDate.format()]: [{ two: 4 }, { one: 2 }]
         });
-      })
-      .catch(done);
+      });
     });
 
-    it('should merge toplists within the given range if given "total" granularity', done => {
+    it('should merge toplists within the given range if given "total" granularity', () => {
       const counter = new TimestampedCounter(metrics, 'foo', { timeGranularity: 'year' });
 
-      const start = moment.utc({ year: 2014 });
-      const end = moment.utc({ year: 2015 });
-      const expected = [{ two: 6 }, { one: 3 }];
+      const startDate = moment.utc({ year: 2014 });
+      const endDate = moment.utc({ year: 2015 });
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
 
-      Promise.all([
-        counter.incr('one'),
-        counter.incr('two'),
-        counter.incr('two')
+      return Promise.all([
+        counter.incr({ eventObj: 'one' }),
+        counter.incrby(2, { eventObj: 'two' })
       ])
       .then(() => {
         clock.tick(1000 * 60 * 60 * 24 * 365);
         return Promise.all([
-          counter.incr('one'),
-          counter.incr('one'),
-          counter.incr('two'),
-          counter.incr('two'),
-          counter.incr('two'),
-          counter.incr('two')
+          counter.incrby(2, { eventObj: 'one' }),
+          counter.incrby(4, { eventObj: 'two' })
         ]);
       })
       .then(() => {
         clock.tick(1000 * 60 * 60 * 24 * 365);
         return Promise.all([
-          counter.incr('one'),
-          counter.incr('two')
+          counter.incr({ eventObj: 'one' }),
+          counter.incr({ eventObj: 'two' })
         ]);
       })
-      .then(() => counter.topRange(start, end, 'total'))
+      .then(() => counter.topRange({ startDate, endDate }, { timeGranularity: 'total' }))
       .then(result => {
-        // Check promise
-        expect(result).to.deep.equal(expected);
-
-        // Check callback
-        counter.topRange(start, end, 'total', (err, res) => {
-          expect(res).to.deep.equal(expected);
-          done();
-        });
-      })
-      .catch(done);
+        expect(result).to.deep.equal([{ two: 6 }, { one: 3 }]);
+      });
     });
 
-    it('can be customized with direction, startingAt and limit', done => {
+    it('can be customized with direction, startingAt and limit', () => {
       const counter = new TimestampedCounter(metrics, 'foo', { timeGranularity: 'year' });
 
-      const start = moment.utc({ year: 2014 });
-      const end = moment.utc({ year: 2015 });
-      const expected = {};
-      expected[start.format()] = [{ two: 2 }, { three: 3 }];
-      expected[end.format()] = [{ two: 4 }, { three: 6 }];
+      const startDate = moment.utc({ year: 2014 });
+      const endDate = moment.utc({ year: 2015 });
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
-
-      Promise.all([
-        counter.incr('one'),
-        counter.incr('two'),
-        counter.incr('two'),
-        counter.incr('three'),
-        counter.incr('three'),
-        counter.incr('three'),
-        counter.incr('four'),
-        counter.incr('four'),
-        counter.incr('four'),
-        counter.incr('four')
+      return Promise.all([
+        counter.incr({ eventObj: 'one' }),
+        counter.incrby(2, { eventObj: 'two' }),
+        counter.incrby(3, { eventObj: 'three' }),
+        counter.incrby(4, { eventObj: 'four' })
       ])
       .then(() => {
         clock.tick(1000 * 60 * 60 * 24 * 365);
         return Promise.all([
-          counter.incr('one'),
-          counter.incr('one'),
-          counter.incr('two'),
-          counter.incr('two'),
-          counter.incr('two'),
-          counter.incr('two'),
-          counter.incr('three'),
-          counter.incr('three'),
-          counter.incr('three'),
-          counter.incr('three'),
-          counter.incr('three'),
-          counter.incr('three'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four')
+          counter.incrby(2, { eventObj: 'one' }),
+          counter.incrby(4, { eventObj: 'two' }),
+          counter.incrby(6, { eventObj: 'three' }),
+          counter.incrby(8, { eventObj: 'four' })
         ]);
       })
-      .then(() => counter.topRange(start, end, 'year', 'asc', 1, 2))
+      .then(() => counter.topRange(
+        { startDate, endDate },
+        { timeGranularity: 'year', direction: 'asc', startingAt: 1, limit: 2 }
+      ))
       .then(result => {
-        // Check promise
-        expect(result).to.deep.equal(expected);
-
-        // Check callback
-        counter.topRange(start, end, 'year', 'asc', 1, 2, (err, res) => {
-          expect(res).to.deep.equal(expected);
-          done();
+        expect(result).to.deep.equal({
+          [startDate.format()]: [{ two: 2 }, { three: 3 }],
+          [endDate.format()]: [{ two: 4 }, { three: 6 }]
         });
-      })
-      .catch(done);
+      });
     });
 
-    it('can be customized with direction, startingAt and limit, on "total" granularity', done => {
+    it('can be customized with direction, startingAt and limit, on "total" granularity', () => {
       const counter = new TimestampedCounter(metrics, 'foo', { timeGranularity: 'year' });
 
-      const start = moment.utc({ year: 2014 });
-      const end = moment.utc({ year: 2015 });
-      const expected = [{ two: 7 }, { three: 8 }];
+      const startDate = moment.utc({ year: 2014 });
+      const endDate = moment.utc({ year: 2015 });
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
 
       // orders are inverted in this first call to make sure that results
       // are not trimmed in the initial zscore calls
-      Promise.all([
-        counter.incr('one'),
-        counter.incr('one'),
-        counter.incr('one'),
-        counter.incr('one'),
-        counter.incr('two'),
-        counter.incr('two'),
-        counter.incr('two'),
-        counter.incr('three'),
-        counter.incr('three'),
-        counter.incr('four')
+      return Promise.all([
+        counter.incrby(4, { eventObj: 'one' }),
+        counter.incrby(3, { eventObj: 'two' }),
+        counter.incrby(2, { eventObj: 'three' }),
+        counter.incr({ eventObj: 'four' })
       ])
       .then(() => {
         clock.tick(1000 * 60 * 60 * 24 * 365);
         return Promise.all([
-          counter.incr('one'),
-          counter.incr('one'),
-          counter.incr('two'),
-          counter.incr('two'),
-          counter.incr('two'),
-          counter.incr('two'),
-          counter.incr('three'),
-          counter.incr('three'),
-          counter.incr('three'),
-          counter.incr('three'),
-          counter.incr('three'),
-          counter.incr('three'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four'),
-          counter.incr('four')
+          counter.incrby(2, { eventObj: 'one' }),
+          counter.incrby(4, { eventObj: 'two' }),
+          counter.incrby(6, { eventObj: 'three' }),
+          counter.incrby(8, { eventObj: 'four' })
         ]);
       })
       .then(() => {
         clock.tick(1000 * 60 * 60 * 24 * 365);
         return Promise.all([
-          counter.incr('one'),
-          counter.incr('two')
+          counter.incr({ eventObj: 'one' }),
+          counter.incr({ eventObj: 'two' })
         ]);
       })
-      .then(() => counter.topRange(start, end, 'total', 'asc', 1, 2))
+      .then(() => counter.topRange(
+        { startDate, endDate },
+        { timeGranularity: 'total', direction: 'asc', startingAt: 1, limit: 2 }
+      ))
       .then(result => {
-        // Check promise
-        expect(result).to.deep.equal(expected);
-
-        // Check callback
-        counter.topRange(start, end, 'total', 'asc', 1, 2, (err, res) => {
-          expect(res).to.deep.equal(expected);
-          done();
-        });
-      })
-      .catch(done);
+        expect(result).to.deep.equal([{ two: 7 }, { three: 8 }]);
+      });
     });
 
-    it('should throw an exc if no from date is given', () => {
-      const counter = new TimestampedCounter(metrics, 'foo', {
-        timeGranularity: 'total'
-      });
+    it('should reject if no start date is given', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', { timeGranularity: 'year' });
 
-      const throwClosure = () => counter.topRange();
-      expect(throwClosure).to.throw(Error);
+      return ensureError(
+        () => counter.topRange({}),
+        err => expect(err.message).to.match(/startDate/)
+      );
     });
 
     it('should throw an exc if an unsupported direction is given', () => {
-      const counter = new TimestampedCounter(metrics, 'foo', {
-        timeGranularity: 'total'
-      });
+      const counter = new TimestampedCounter(metrics, 'foo', { timeGranularity: 'year' });
 
-      const throwClosure = () => counter.topRange(new Date(), new Date(), 'total', 1);
-      expect(throwClosure).to.throw(Error);
+      return ensureError(
+        () => counter.topRange(new Date(), { direction: 1 }),
+        err => expect(err.message).to.match(/direction option/)
+      );
     });
   });
 
   describe('trimEvents', () => {
     let counter;
+
     beforeEach(() => {
       counter = new TimestampedCounter(metrics, 'fruits', {
         timeGranularity: 'hour'
       });
       return Promise.all([
-        counter.incrby(10, 'apples'),
-        counter.incrby(8, 'oranges'),
-        counter.incrby(7, 'pears'),
-        counter.incrby(5, 'peaches'),
-        counter.incrby(2, 'mangos'),
+        counter.incrby(10, { eventObj: 'apples' }),
+        counter.incrby(8, { eventObj: 'oranges' }),
+        counter.incrby(7, { eventObj: 'pears' }),
+        counter.incrby(5, { eventObj: 'peaches' }),
+        counter.incrby(2, { eventObj: 'mangos' })
       ]);
     });
 
-    it('should throw an exception if the direction argument is not correct', done => {
-      try {
-        counter.trimEvents('dummy');
-      } catch (e) {
-        return done();
-      }
-
-      throw new Error('This should never be called.');
+    it('should reject if the direction argument is not correct', () => {
+      return ensureError(
+        () => counter.trimEvents({ direction: 'dummy' }),
+        err => expect(err.message).to.match(/direction/)
+      );
     });
 
-    it('should resolve to a failure if a subcommand fails', done => {
+    it('should reject if a subcommand fails', () => {
       sandbox.stub(metrics.client, 'zremrangebyrank')
         .yields(new Error('oh no'));
-      counter.trimEvents()
-        .then(() => done(new Error('should not be here')))
-        .catch(err => {
-          expect(err).to.be.an('error');
-          expect(err.message).to.equal('oh no');
-          done();
-        });
-    });
 
-    it('should call the callback with an error if a subcommand fails', done => {
-      sandbox.stub(metrics.client, 'zremrangebyrank')
-        .yields(new Error('oh no'));
-      counter.trimEvents(err => {
-        try {
+      return ensureError(
+        () => counter.trimEvents(),
+        err => {
           expect(err).to.be.an('error');
           expect(err.message).to.equal('oh no');
-          done();
-        } catch (e) {
-          done(e);
         }
-      });
+      );
     });
 
     it('should trim to 1000 elements by default', () => {
@@ -1625,7 +1279,7 @@ describe('Counter', () => {
     });
 
     it('should support descending trim', () => {
-      return counter.trimEvents('desc', 3)
+      return counter.trimEvents({ direction: 'desc', limit: 3 })
         .then(removed => {
           // It removed 2 from total, 2 from year, 2 from month and 2 from day.
           expect(removed).to.equal(8);
@@ -1642,7 +1296,7 @@ describe('Counter', () => {
     });
 
     it('should support ascending trim', () => {
-      return counter.trimEvents('asc', 3)
+      return counter.trimEvents({ direction: 'asc', limit: 3 })
         .then(removed => {
           // It removed 2 from total, 2 from year, 2 from month and 2 from day.
           expect(removed).to.equal(8);
@@ -1658,18 +1312,6 @@ describe('Counter', () => {
             { mangos: 2 }
           ]);
         });
-    });
-
-    it('should support a callback', done => {
-      counter.trimEvents('desc', 3, (err, removed) => {
-        try {
-          expect(err).to.equal(null);
-          expect(removed).to.equal(8);
-          done();
-        } catch (e) {
-          done(e);
-        }
-      });
     });
 
     context('given a counter with only total granularity', () => {
@@ -1690,7 +1332,7 @@ describe('Counter', () => {
       });
 
       it('should support descending trim', () => {
-        return counter.trimEvents('desc', 3)
+        return counter.trimEvents({ direction: 'desc', limit: 3 })
           .then(removed => {
             expect(removed).to.equal(2);
             return counter.top();
@@ -1706,7 +1348,7 @@ describe('Counter', () => {
       });
 
       it('should support ascending trim', () => {
-        return counter.trimEvents('asc', 3)
+        return counter.trimEvents({ direction: 'asc', limit: 3 })
           .then(removed => {
             expect(removed).to.equal(2);
             return counter.top();
@@ -1738,12 +1380,12 @@ describe('Counter', () => {
           return counter.incr();
         })
         .then(() => counter.incr())
-        .then(() => counter.count('total'))
+        .then(() => counter.count())
         .then(count => {
           expect(count).to.equal(3);
           return counter.zero();
         })
-        .then(() => counter.count('total'))
+        .then(() => counter.count())
         .then(count => expect(count).to.equal(0));
     });
 
@@ -1751,12 +1393,12 @@ describe('Counter', () => {
       const counter = new TimestampedCounter(metrics, 'foo');
 
       return Promise.all([counter.incr(), counter.incr()])
-        .then(() => counter.count('total'))
+        .then(() => counter.count())
         .then(count => {
           expect(count).to.equal(2);
           return counter.zero();
         })
-        .then(() => counter.count('total'))
+        .then(() => counter.count())
         .then(count => expect(count).to.equal(0));
     });
 
@@ -1767,26 +1409,32 @@ describe('Counter', () => {
 
       const clock = sandbox.useFakeTimers(new Date('2014-02-01').getTime());
       return Promise.all([
-        counter.incrby(2, 'five'),
-        counter.incr('two')
+        counter.incrby(2, { eventObj: 'five' }),
+        counter.incr({ eventObj: 'two' })
       ])
       .then(() => {
         clock.tick(1000 * 60 * 60 * 24 * 365);
         return Promise.all([
-          counter.incrby(3, 'five'),
-          counter.incr('two')
+          counter.incrby(3, { eventObj: 'five' }),
+          counter.incr({ eventObj: 'two' })
         ]);
       })
-      .then(() => Promise.all([counter.count('total', 'five'), counter.count('total', 'two')]))
-      .then(res => {
-        expect(res[0]).to.equal(5);
-        expect(res[1]).to.equal(2);
-        return counter.zero('five');
+      .then(() => Promise.all([
+        counter.count({ eventObj: 'five' }),
+        counter.count({ eventObj: 'two' })
+      ]))
+      .then(([fiveCount, twoCount]) => {
+        expect(fiveCount).to.equal(5);
+        expect(twoCount).to.equal(2);
+        return counter.zero({ eventObj: 'five' });
       })
-      .then(() => Promise.all([counter.count('total', 'five'), counter.count('total', 'two')]))
-      .then(res => {
-        expect(res[0]).to.equal(0);
-        expect(res[1]).to.equal(2);
+      .then(() => Promise.all([
+        counter.count({ eventObj: 'five' }),
+        counter.count({ eventObj: 'two' })
+      ]))
+      .then(([fiveCount, twoCount]) => {
+        expect(fiveCount).to.equal(0);
+        expect(twoCount).to.equal(2);
       });
     });
 
@@ -1795,15 +1443,8 @@ describe('Counter', () => {
         timeGranularity: 'day'
       });
 
-      const start = moment.utc({ year: 2015, day: 1 });
-      const end = moment.utc({ year: 2015, day: 2 });
-      const expectedBefore = {};
-      expectedBefore[start.format()] = 1;
-      expectedBefore[end.format()] = 2;
-
-      const expectedAfter = {};
-      expectedAfter[start.format()] = 0;
-      expectedAfter[end.format()] = 0;
+      const startDate = moment.utc({ year: 2015, day: 1 });
+      const endDate = moment.utc({ year: 2015, day: 2 });
 
       const clock = sandbox.useFakeTimers(new Date('2015-01-01').getTime());
       return counter.incr()
@@ -1811,13 +1452,19 @@ describe('Counter', () => {
           clock.tick(1000 * 60 * 60 * 24);
           return counter.incrby(2);
         })
-        .then(() => counter.countRange('day', start, end))
+        .then(() => counter.countRange('day', { startDate, endDate }))
         .then(result => {
-          expect(result).to.deep.equal(expectedBefore);
+          expect(result).to.deep.equal({
+            [startDate.format()]: 1,
+            [endDate.format()]: 2
+          });
           return counter.zero();
         })
-        .then(() => counter.countRange('day', start, end))
-        .then(result => expect(result).to.deep.equal(expectedAfter));
+        .then(() => counter.countRange('day', { startDate, endDate }))
+        .then(result => expect(result).to.deep.equal({
+          [startDate.format()]: 0,
+          [endDate.format()]: 0
+        }));
     });
   });
 });
