@@ -458,6 +458,13 @@ describe('Counter', () => {
         expect(utils.parseIntArray(results)).to.deep.equal([1, 1]);
       });
     });
+
+    it('should work with a falsy event object', () => {
+      const counter = new TimestampedCounter(metrics, 'foo', { expireKeys: false });
+      return counter.incr(0)
+        .then(() => counter.incr())
+        .then(result => expect(parseInt(result)).to.equal(1));
+    });
   });
 
   describe('incrby', () => {
