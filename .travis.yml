@@ -11,7 +11,7 @@ script: npm run testci
 deploy:
   provider: npm
   api_key:
-    secure: jINm2YE0ZKLivzGW40OhI91FRNWWGkHSjRqR9JtMPFiCJD6ol1SxNg+QjS2m8hkeCmSaJ8ZmT+wsIWThfYJixFh+nO4+ixhDF0hgyMgCUCHd5KCZUKkwgjBMmGiopVHqCOh24qjSQH4Tx2WiL0n8lFN8EOgrH54n2iwcro4oSPA=
+    secure: QnQR0s6z6kwjLZIabAZfN/1f8OjDDNwb66QRvzCgQCQfxMw62ECnApyokuJYT1AX0/7S4PPYhkBHkCd1GSwaYwa4hQ+0k4TJh/W9niSNBwKR7CfJ0/yfvnYSR2x+uGVd2Ontpb9GeW9QDFC+Jq39p/u0CS+1dSCvezbUfoMHVG4=
   email:
     secure: ReldtI/qWiezDWylhENP+QWnyTlVOQgfdUoCmfZ+3yt70hdRMZeFF2Lwhp31Lzlf+8KmSlw1TGPTyTHqv1SE/artFuGr1+GuDp6bC17aBsSx9G5bc/QpQtL+xW4f+3/kS+Zubxa4D6ajxMa+lfR0qPAhBdso5vjXyypCmp4CaOU=
   on:
