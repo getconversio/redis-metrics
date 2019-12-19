@@ -1,15 +1,16 @@
 'use strict';
 
+/* eslint-disable no-new */
+
 const redis = require('redis'),
   sinon = require('sinon'),
   chai = require('chai'),
   RedisMetrics = require('../lib/metrics'),
   TimestampedCounter = require('../lib/counter');
 
-const expect = chai.expect;
+const { expect } = chai;
 
 describe('Metric main', () => {
-
   let sandbox;
   beforeEach(() => {
     sandbox = sinon.sandbox.create();
@@ -62,7 +63,7 @@ describe('Metric main', () => {
         .expects('createClient')
         .never();
 
-      new RedisMetrics({ client: client });
+      new RedisMetrics({ client });
       mock.verify();
     });
   });
@@ -95,5 +96,4 @@ describe('Metric main', () => {
       expect(counter.options.timeGranularity).to.equal(2);
     });
   });
-
 });

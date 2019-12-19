@@ -9,7 +9,7 @@ const chai = require('chai'),
   constants = require('../lib/constants'),
   utils = require('../lib/utils');
 
-const expect = chai.expect;
+const { expect } = chai;
 
 describe('Counter', () => {
   let metrics;
@@ -21,11 +21,11 @@ describe('Counter', () => {
     const port = process.env.REDIS_PORT || 6379;
     if (process.env.USE_IOREDIS) {
       const client = new IORedis(port, host);
-      metrics = new RedisMetrics({ client: client });
+      metrics = new RedisMetrics({ client });
     } else {
       metrics = new RedisMetrics({
-        host: host,
-        port: port
+        host,
+        port
       });
     }
     metrics.client.flushall(done);
@@ -418,7 +418,7 @@ describe('Counter', () => {
       });
 
       return counter.incr('bar').then(result => {
-        expect(parseInt(result)).to.equal(1);
+        expect(parseInt(result, 10)).to.equal(1);
       });
     });
 
@@ -430,7 +430,7 @@ describe('Counter', () => {
       );
 
       return counter.incr('bar').then(result => {
-        expect(parseInt(result)).to.equal(1);
+        expect(parseInt(result, 10)).to.equal(1);
       });
     });
 
@@ -463,7 +463,7 @@ describe('Counter', () => {
       const counter = new TimestampedCounter(metrics, 'foo', { expireKeys: false });
       return counter.incr(0)
         .then(() => counter.incr())
-        .then(result => expect(parseInt(result)).to.equal(1));
+        .then(result => expect(parseInt(result, 10)).to.equal(1));
     });
   });
 
@@ -624,7 +624,7 @@ describe('Counter', () => {
       const counter = new TimestampedCounter(metrics, 'foo');
 
       counter.incrby(9, 'bar').then(result => {
-        expect(parseInt(result)).to.equal(9);
+        expect(parseInt(result, 10)).to.equal(9);
         done();
       })
       .catch(done);
@@ -1581,7 +1581,7 @@ describe('Counter', () => {
         counter.incrby(8, 'oranges'),
         counter.incrby(7, 'pears'),
         counter.incrby(5, 'peaches'),
-        counter.incrby(2, 'mangos'),
+        counter.incrby(2, 'mangos')
       ]);
     });
 
